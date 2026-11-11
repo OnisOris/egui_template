@@ -1,6 +1,7 @@
-use std::fs::{self, File};
-use std::io::Write;
+use std::fs::{self, File, OpenOptions};
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::Sender;
 use std::thread;
 
@@ -57,20 +58,51 @@ pub fn save(document: Document, sender: Sender<FileMessage>, context: Context) {
     });
 }
 
-fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    let mut temporary = path.as_os_str().to_owned();
-    temporary.push(".tmp");
-    let temporary = PathBuf::from(temporary);
+fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let (temporary, mut file) = create_temporary(path)?;
     let result = (|| {
-        let mut file = File::create(&temporary)?;
         file.write_all(bytes)?;
         file.sync_all()?;
-        fs::rename(&temporary, path)
+        drop(file);
+        fs::rename(&temporary, path)?;
+        sync_parent(path)
     })();
     if result.is_err() {
         let _ = fs::remove_file(&temporary);
     }
     result
+}
+
+fn create_temporary(path: &Path) -> io::Result<(PathBuf, File)> {
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    loop {
+        let unique = NEXT.fetch_add(1, Ordering::Relaxed);
+        let candidate = path.with_file_name(format!(".{name}.{}.{unique}.tmp", std::process::id()));
+        match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&candidate)
+        {
+            Ok(file) => return Ok((candidate, file)),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
+        }
+    }
+}
+
+#[cfg(unix)]
+fn sync_parent(path: &Path) -> io::Result<()> {
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    File::open(parent)?.sync_all()
+}
+
+#[cfg(not(unix))]
+fn sync_parent(_path: &Path) -> io::Result<()> {
+    Ok(())
 }
 
 #[cfg(test)]
@@ -87,8 +119,8 @@ mod tests {
 
     #[test]
     fn atomic_write_replaces_the_file_and_leaves_no_temporary() {
-        let directory =
-            std::env::temp_dir().join(format!("starter-atomic-save-{}", std::process::id()));
+        let directory = test_directory("replace");
+        let _ = fs::remove_dir_all(&directory);
         fs::create_dir_all(&directory).unwrap();
         let path = directory.join("scene.json");
         fs::write(&path, b"old").unwrap();
@@ -96,7 +128,44 @@ mod tests {
         write_atomic(&path, b"new").unwrap();
 
         assert_eq!(fs::read(&path).unwrap(), b"new");
-        assert!(!directory.join("scene.json.tmp").exists());
+        assert!(temporary_files(&directory).is_empty());
         fs::remove_dir_all(&directory).unwrap();
+    }
+
+    #[test]
+    fn concurrent_writes_use_unique_temporary_files() {
+        let directory = test_directory("concurrent");
+        let _ = fs::remove_dir_all(&directory);
+        fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("scene.json");
+
+        let writers: Vec<_> = [b"first".as_slice(), b"second".as_slice()]
+            .into_iter()
+            .map(|bytes| {
+                let path = path.clone();
+                std::thread::spawn(move || write_atomic(&path, bytes).unwrap())
+            })
+            .collect();
+        for writer in writers {
+            writer.join().unwrap();
+        }
+
+        let saved = fs::read(&path).unwrap();
+        assert!(saved == b"first" || saved == b"second");
+        assert!(temporary_files(&directory).is_empty());
+        fs::remove_dir_all(&directory).unwrap();
+    }
+
+    fn test_directory(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("starter-atomic-save-{}-{name}", std::process::id()))
+    }
+
+    fn temporary_files(directory: &Path) -> Vec<PathBuf> {
+        fs::read_dir(directory)
+            .unwrap()
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| path.extension().is_some_and(|extension| extension == "tmp"))
+            .collect()
     }
 }

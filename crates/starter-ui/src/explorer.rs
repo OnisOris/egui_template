@@ -40,6 +40,7 @@ impl<IdType: NodeId + Send + Sync + 'static> ExplorerTree<IdType> {
     ) -> Vec<Action<IdType>> {
         TreeView::new(id)
             .allow_multi_selection(true)
+            .fill_available_height(false)
             .fallback_context_menu(context_menu)
             .show_state(ui, &mut self.state, build)
             .1

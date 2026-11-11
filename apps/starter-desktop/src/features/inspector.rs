@@ -1,5 +1,5 @@
 use eframe::egui::{self, Color32, Ui};
-use starter_core::{Command, DocumentState, ObjectId};
+use starter_core::{Command, DocumentState, MAX_NAME_LENGTH, ObjectId};
 
 #[derive(Default)]
 pub struct InspectorState {
@@ -28,8 +28,14 @@ pub fn show(ui: &mut Ui, state: &DocumentState, inspector: &mut InspectorState) 
         .name_draft
         .as_mut()
         .expect("draft initialized above");
-    if ui.text_edit_singleline(name).lost_focus() {
+    let response = ui.text_edit_singleline(name);
+    if response.lost_focus() {
         commands.push(Command::SetName(id, name.clone()));
+    } else if !response.has_focus() && valid_name(name) && name != object.name() {
+        // Follow external renames, but keep an invalid draft so it stays editable.
+        *name = object.name().to_owned();
+        // The widget already drew the old value this frame.
+        ui.ctx().request_repaint();
     }
     let mut x = object.position().x;
     let mut y = object.position().y;
@@ -66,4 +72,9 @@ pub fn show(ui: &mut Ui, state: &DocumentState, inspector: &mut InspectorState) 
         commands.push(Command::SetEnabled(id, enabled));
     }
     commands
+}
+
+fn valid_name(name: &str) -> bool {
+    let trimmed = name.trim();
+    !trimmed.is_empty() && trimmed.len() <= MAX_NAME_LENGTH
 }

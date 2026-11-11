@@ -11,7 +11,6 @@ pub struct ViewportState {
 pub struct Camera {
     zoom: f32,
     pan: Vec2,
-    viewport_center: Option<Pos2>,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -28,12 +27,6 @@ impl Camera {
 
     pub fn reset(&mut self) {
         *self = Self::default();
-    }
-
-    pub fn preserve_center(&mut self, center: Pos2) {
-        if let Some(previous) = self.viewport_center.replace(center) {
-            self.pan += previous - center;
-        }
     }
 
     pub fn world_to_screen(&self, world: Position, center: Pos2) -> Pos2 {
@@ -82,19 +75,31 @@ mod tests {
     }
 
     #[test]
-    fn viewport_resize_keeps_scene_fixed_on_screen() {
+    fn new_camera_centers_the_scene_in_the_viewport() {
+        let camera = Camera::default();
+        let center = Pos2::new(800.0, 500.0);
+        assert_eq!(camera.world_to_screen(Position::default(), center), center);
+    }
+
+    #[test]
+    fn viewport_resize_keeps_the_view_center_on_the_same_world_point() {
         let mut camera = Camera::default();
+        camera.pan_by(Vec2::new(40.0, -20.0));
         let before = Pos2::new(640.0, 400.0);
         let after = Pos2::new(570.0, 400.0);
-        let object = Position { x: 80.0, y: 25.0 };
-        let position_before = camera.world_to_screen(object, before);
-        camera.preserve_center(before);
-        camera.preserve_center(after);
-        assert!(
-            camera
-                .world_to_screen(object, after)
-                .distance(position_before)
-                < 0.001
-        );
+        let world_at_center = camera.screen_to_world(before, before);
+
+        // The camera is relative to the viewport center, so resizing recenters
+        // the same world point instead of pinning it to an old screen position.
+        assert_eq!(camera.world_to_screen(world_at_center, after), after);
+    }
+
+    #[test]
+    fn reset_centers_the_scene_again() {
+        let mut camera = Camera::default();
+        let center = Pos2::new(640.0, 400.0);
+        camera.focus(Position { x: 120.0, y: -30.0 });
+        camera.reset();
+        assert_eq!(camera.world_to_screen(Position::default(), center), center);
     }
 }
