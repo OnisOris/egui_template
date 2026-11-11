@@ -177,8 +177,10 @@ pub fn load_terrain(directory: &Path) -> Result<TerrainPayload, String> {
         return Err("heights.f32 size does not match width × height × 4.".into());
     }
     let samples_msl: Vec<_> = bytes
-        .chunks_exact(4)
-        .map(|b| f32::from_le_bytes(b.try_into().unwrap()))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|b| f32::from_le_bytes(*b))
         .collect();
     if samples_msl.iter().any(|v| !v.is_finite()) {
         return Err("DEM samples must be finite.".into());
