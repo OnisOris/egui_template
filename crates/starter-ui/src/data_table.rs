@@ -1,8 +1,9 @@
-use eframe::egui::{self, Ui};
+use egui::{self, Ui};
+use egui_table::{CellInfo, Column, HeaderCellInfo, TableDelegate};
+use serde::{Deserialize, Serialize};
 use starter_core::{Command, DocumentState, ObjectId, SceneObject};
-use starter_ui::{CellInfo, Column, HeaderCellInfo, TableDelegate, show_table};
 
-use crate::state::TableSort;
+use crate::show_table;
 
 pub struct TableState {
     pub filter: String,
@@ -182,4 +183,14 @@ impl TableDelegate for ObjectTable<'_> {
             self.clicked = Some(id);
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub enum TableSort {
+    #[default]
+    Id,
+    Name,
+    X,
+    Y,
+    Size,
 }

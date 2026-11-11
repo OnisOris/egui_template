@@ -30,6 +30,8 @@ pub struct DocumentState {
     name_revision: u64,
     position_revision: u64,
     size_revision: u64,
+    color_revision: u64,
+    visible_revision: u64,
 }
 
 impl Default for DocumentState {
@@ -44,6 +46,8 @@ impl Default for DocumentState {
             name_revision: 0,
             position_revision: 0,
             size_revision: 0,
+            color_revision: 0,
+            visible_revision: 0,
         }
     }
 }
@@ -96,11 +100,21 @@ impl DocumentState {
         self.size_revision
     }
 
+    pub fn color_revision(&self) -> u64 {
+        self.color_revision
+    }
+
+    pub fn visible_revision(&self) -> u64 {
+        self.visible_revision
+    }
+
     pub fn dispatch(&mut self, command: Command) -> Result<Option<ObjectId>, DocumentError> {
         let mut structure_changed = false;
         let mut name_changed = false;
         let mut position_changed = false;
         let mut size_changed = false;
+        let mut color_changed = false;
+        let mut visible_changed = false;
         let result = match command {
             Command::NewDocument => {
                 structure_changed = !self.document.objects().is_empty();
@@ -194,6 +208,7 @@ impl DocumentState {
                 let object = self
                     .object_mut(id)
                     .ok_or(DocumentError::InvalidObject(id))?;
+                color_changed = object.color != color;
                 object.color = color;
                 None
             }
@@ -201,6 +216,7 @@ impl DocumentState {
                 let object = self
                     .object_mut(id)
                     .ok_or(DocumentError::InvalidObject(id))?;
+                visible_changed = object.visible != visible;
                 object.visible = visible;
                 None
             }
@@ -223,6 +239,12 @@ impl DocumentState {
         }
         if size_changed {
             self.size_revision = self.size_revision.wrapping_add(1);
+        }
+        if color_changed {
+            self.color_revision = self.color_revision.wrapping_add(1);
+        }
+        if visible_changed {
+            self.visible_revision = self.visible_revision.wrapping_add(1);
         }
         Ok(result)
     }

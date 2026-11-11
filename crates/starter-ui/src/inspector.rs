@@ -1,9 +1,19 @@
-use eframe::egui::{self, Color32, Ui};
+use egui::{self, Color32, Ui};
 use starter_core::{Command, DocumentState, MAX_NAME_LENGTH, ObjectId};
 
 #[derive(Default)]
 pub struct InspectorState {
-    pub(crate) name_draft: Option<(ObjectId, String)>,
+    name_draft: Option<(ObjectId, String)>,
+}
+
+impl InspectorState {
+    pub fn draft_id(&self) -> Option<ObjectId> {
+        self.name_draft.as_ref().map(|(id, _)| *id)
+    }
+
+    pub fn draft_name(&self) -> Option<&str> {
+        self.name_draft.as_ref().map(|(_, name)| name.as_str())
+    }
 }
 
 pub fn show(ui: &mut Ui, state: &DocumentState, inspector: &mut InspectorState) -> Vec<Command> {

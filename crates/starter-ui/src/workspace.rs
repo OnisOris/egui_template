@@ -63,7 +63,7 @@ impl Workspace {
             shares.set_share(inspector, 0.20);
         }
         Self {
-            tree: Tree::new(Id::unique("starter_workspace"), root, tiles),
+            tree: Tree::new(Id::new("starter_workspace"), root, tiles),
         }
     }
 

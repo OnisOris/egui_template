@@ -221,10 +221,10 @@ impl eframe::App for StarterApp {
         } = ui_state;
         workspace.show(ui, |panel_ui, pane| {
             let commands = match pane {
-                PanelId::Explorer => features::explorer::show(panel_ui, document, explorer),
+                PanelId::Explorer => starter_ui::show_explorer(panel_ui, document, explorer),
                 PanelId::Viewport => features::scene::show(panel_ui, document, viewport),
-                PanelId::Inspector => features::inspector::show(panel_ui, document, inspector),
-                PanelId::DataTable => features::table::show(panel_ui, document, table),
+                PanelId::Inspector => starter_ui::show_inspector(panel_ui, document, inspector),
+                PanelId::DataTable => starter_ui::show_data_table(panel_ui, document, table),
                 PanelId::Charts => {
                     features::analytics::show(panel_ui, analytics, metrics);
                     Vec::new()

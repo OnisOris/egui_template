@@ -10,6 +10,7 @@ egui_ltreeview.workspace = true
 egui_table.workspace = true
 egui_plot.workspace = true
 serde.workspace = true
+starter-core = { path = "../starter-core" }
 
 [dev-dependencies]
 egui_kittest.workspace = true

@@ -1,11 +1,8 @@
 use serde::{Deserialize, Serialize};
 use starter_core::{ObjectId, TEST_LOADS};
-use starter_ui::{Theme, Workspace};
+use starter_ui::{ExplorerNodeId, InspectorState, TableSort, TableState, Theme, Workspace};
 
-use crate::features::{
-    analytics::AnalyticsState, explorer::ExplorerNodeId, gallery::GalleryState,
-    inspector::InspectorState, scene::ViewportState, table::TableState,
-};
+use crate::features::{analytics::AnalyticsState, gallery::GalleryState, scene::ViewportState};
 
 pub struct UiState {
     pub workspace: Workspace,
@@ -47,16 +44,6 @@ pub struct Preferences {
     pub table_sort: TableSort,
     pub table_ascending: bool,
     pub selected_objects: Vec<ObjectId>,
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-pub enum TableSort {
-    #[default]
-    Id,
-    Name,
-    X,
-    Y,
-    Size,
 }
 
 impl UiState {

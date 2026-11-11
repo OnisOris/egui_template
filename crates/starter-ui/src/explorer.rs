@@ -22,6 +22,11 @@ impl<IdType: NodeId + Send + Sync + 'static> ExplorerTree<IdType> {
         self.state.set_selected(selected);
     }
 
+    /// Default-open directories report `true` until the user toggles them.
+    pub fn is_open(&self, id: &IdType) -> bool {
+        self.state.is_open(id).unwrap_or(true)
+    }
+
     pub fn show(
         &mut self,
         ui: &mut Ui,
@@ -40,7 +45,6 @@ impl<IdType: NodeId + Send + Sync + 'static> ExplorerTree<IdType> {
     ) -> Vec<Action<IdType>> {
         TreeView::new(id)
             .allow_multi_selection(true)
-            .fill_available_height(false)
             .fallback_context_menu(context_menu)
             .show_state(ui, &mut self.state, build)
             .1

@@ -3,16 +3,14 @@
 use eframe::egui::{self, Key, Modifiers, PointerButton, Pos2, accesskit::Role};
 use egui_kittest::{Harness, kittest::Queryable};
 use starter_core::{Command, DocumentState, ObjectId, Position};
-use starter_ui::ExplorerTree;
+use starter_ui::{
+    ExplorerNodeId, ExplorerTree, InspectorState, TableState, show_data_table, show_explorer,
+    show_inspector,
+};
 
 use crate::{
     commands,
-    features::{
-        explorer::{self, ExplorerNodeId},
-        inspector::{self, InspectorState},
-        scene::{self, ViewportState},
-        table::{self, TableState},
-    },
+    features::scene::{self, ViewportState},
 };
 
 struct Chain {
@@ -74,15 +72,13 @@ fn type_name(harness: &mut Harness<Chain>, text: &str) {
 }
 
 fn inspector_harness(chain: Chain) -> Harness<'static, Chain> {
-    let mut harness = Harness::builder()
-        .with_accessibility_check(false)
-        .build_ui_state(
-            |ui, chain: &mut Chain| {
-                let pending = inspector::show(ui, &chain.state, &mut chain.inspector);
-                chain.pending.extend(pending);
-            },
-            chain,
-        );
+    let mut harness = Harness::builder().build_ui_state(
+        |ui, chain: &mut Chain| {
+            let pending = show_inspector(ui, &chain.state, &mut chain.inspector);
+            chain.pending.extend(pending);
+        },
+        chain,
+    );
     harness.run();
     harness
 }
@@ -90,7 +86,6 @@ fn inspector_harness(chain: Chain) -> Harness<'static, Chain> {
 fn viewport_harness(chain: Chain) -> Harness<'static, Chain> {
     let mut harness = Harness::builder()
         .with_size(egui::vec2(640.0, 480.0))
-        .with_accessibility_check(false)
         .build_ui_state(
             |ui, chain: &mut Chain| {
                 let pending = scene::show(ui, &chain.state, &mut chain.viewport);
@@ -105,10 +100,9 @@ fn viewport_harness(chain: Chain) -> Harness<'static, Chain> {
 fn explorer_harness(chain: Chain) -> Harness<'static, Chain> {
     let mut harness = Harness::builder()
         .with_size(egui::vec2(240.0, 320.0))
-        .with_accessibility_check(false)
         .build_ui_state(
             |ui, chain: &mut Chain| {
-                let pending = explorer::show(ui, &chain.state, &mut chain.explorer);
+                let pending = show_explorer(ui, &chain.state, &mut chain.explorer);
                 chain.pending.extend(pending);
             },
             chain,
@@ -128,7 +122,7 @@ fn invalid_name_keeps_the_draft_editable() {
     let chain = harness.state();
     assert!(chain.notice.is_some());
     assert_eq!(chain.state.object(ObjectId(1)).unwrap().name(), "Object 1");
-    assert_eq!(chain.inspector.name_draft.as_ref().unwrap().1, "   ");
+    assert_eq!(chain.inspector.draft_name(), Some("   "));
 
     type_name(&mut harness, "Renamed");
 
@@ -169,10 +163,9 @@ fn viewport_selection_reaches_inspector_and_table() {
     let chain = harness.into_state();
     let mut harness = Harness::builder()
         .with_size(egui::vec2(800.0, 600.0))
-        .with_accessibility_check(false)
         .build_ui_state(
             |ui, chain: &mut Chain| {
-                let pending = table::show(ui, &chain.state, &mut chain.table);
+                let pending = show_data_table(ui, &chain.state, &mut chain.table);
                 chain.pending.extend(pending);
             },
             chain,
@@ -211,7 +204,6 @@ fn wheel_over_the_viewport_zooms_the_camera() {
         unit: egui::MouseWheelUnit::Line,
         delta: egui::vec2(0.0, 1.0),
         phase: egui::TouchPhase::Move,
-        source: egui::MouseWheelSource::Unknown,
         modifiers: Modifiers::default(),
     });
     harness.run();
@@ -241,7 +233,6 @@ fn explorer_scrolls_to_the_last_object() {
             unit: egui::MouseWheelUnit::Line,
             delta: egui::vec2(0.0, -100_000.0),
             phase: egui::TouchPhase::Move,
-            source: egui::MouseWheelSource::Unknown,
             modifiers: Modifiers::default(),
         });
         harness.run_steps(100);
@@ -311,10 +302,7 @@ fn switching_selection_resets_the_name_draft() {
         harness.get_by_role(Role::TextInput).value().as_deref(),
         Some("Object 2")
     );
-    assert_eq!(
-        harness.state().inspector.name_draft.as_ref().unwrap().0,
-        ObjectId(2)
-    );
+    assert_eq!(harness.state().inspector.draft_id().unwrap(), ObjectId(2));
 }
 
 #[test]

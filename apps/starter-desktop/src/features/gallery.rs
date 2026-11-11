@@ -84,7 +84,7 @@ fn basics(ui: &mut Ui, state: &mut GalleryState, open_file: &mut bool) {
 fn data_components(ui: &mut Ui, state: &mut GalleryState) {
     ui.columns(2, |columns| {
         columns[0].strong("Tree view");
-        let tree_id = columns[0].scope_id().with("gallery_tree");
+        let tree_id = columns[0].id().with("gallery_tree");
         state.tree.show(&mut columns[0], tree_id, |tree| {
             if tree.dir(0_u8, "Project") {
                 tree.leaf(1_u8, "Scene");
