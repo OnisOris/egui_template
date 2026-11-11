@@ -83,7 +83,19 @@ impl Workspace {
     }
 
     pub fn show(&mut self, ui: &mut Ui, mut draw: impl FnMut(&mut Ui, PanelId)) {
-        self.tree.ui(&mut WorkspaceBehavior { draw: &mut draw }, ui);
+        let mut hidden = Vec::new();
+        self.tree.ui(
+            &mut WorkspaceBehavior {
+                draw: &mut draw,
+                hidden: &mut hidden,
+            },
+            ui,
+        );
+        // Hide after the layout pass: hiding the last tab of a nested container mid-frame
+        // leaves egui_tiles with a stale visible-child list and panics in debug builds.
+        for tile_id in hidden {
+            self.tree.tiles.set_visible(tile_id, false);
+        }
     }
 
     fn tile_id(&self, pane: PanelId) -> Option<TileId> {
@@ -96,6 +108,7 @@ impl Workspace {
 
 struct WorkspaceBehavior<'a, Draw> {
     draw: &'a mut Draw,
+    hidden: &'a mut Vec<TileId>,
 }
 
 impl<Draw> Behavior<PanelId> for WorkspaceBehavior<'_, Draw>
@@ -107,6 +120,9 @@ where
     }
 
     fn pane_ui(&mut self, ui: &mut Ui, _tile_id: TileId, pane: &mut PanelId) -> UiResponse {
+        // Panes are surfaces: without this the window clear color shows through.
+        ui.painter()
+            .rect_filled(ui.max_rect(), 0.0, ui.visuals().panel_fill);
         (self.draw)(ui, *pane);
         UiResponse::None
     }
@@ -115,8 +131,8 @@ where
         true
     }
 
-    fn on_tab_close(&mut self, tiles: &mut Tiles<PanelId>, tile_id: TileId) -> bool {
-        tiles.set_visible(tile_id, false);
+    fn on_tab_close(&mut self, _tiles: &mut Tiles<PanelId>, tile_id: TileId) -> bool {
+        self.hidden.push(tile_id);
         false
     }
 }
