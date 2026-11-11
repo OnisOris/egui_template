@@ -19,6 +19,8 @@ cargo build --workspace --release
 ./scripts/check.sh
 ```
 
+The same checks run in GitHub Actions on every push and pull request.
+
 The app can also be run from the workspace root with `cargo run --release` (the desktop app is the default member).
 
 ## Included UI
