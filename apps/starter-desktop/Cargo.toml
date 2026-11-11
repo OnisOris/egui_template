@@ -1,0 +1,14 @@
+[package]
+name = "starter-desktop"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+eframe.workspace = true
+egui.workspace = true
+pollster.workspace = true
+rfd.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+starter-core = { path = "../../crates/starter-core" }
+starter-ui = { path = "../../crates/starter-ui" }

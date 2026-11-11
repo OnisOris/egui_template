@@ -1,0 +1,16 @@
+[package]
+name = "starter-ui"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+egui.workspace = true
+egui_tiles.workspace = true
+egui_ltreeview.workspace = true
+egui_table.workspace = true
+egui_plot.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+egui_kittest.workspace = true
+serde_json.workspace = true
