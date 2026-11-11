@@ -2266,6 +2266,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "egui",
+ "egui_kittest",
  "pollster",
  "rfd",
  "serde",

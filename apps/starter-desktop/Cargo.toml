@@ -12,3 +12,6 @@ serde.workspace = true
 serde_json.workspace = true
 starter-core = { path = "../../crates/starter-core" }
 starter-ui = { path = "../../crates/starter-ui" }
+
+[dev-dependencies]
+egui_kittest.workspace = true

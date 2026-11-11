@@ -12,7 +12,12 @@ pub enum ExplorerNodeId {
     Resources,
 }
 
-pub fn show(ui: &mut Ui, state: &mut DocumentState, tree: &mut ExplorerTree<ExplorerNodeId>) {
+pub fn show(
+    ui: &mut Ui,
+    state: &DocumentState,
+    tree: &mut ExplorerTree<ExplorerNodeId>,
+) -> Vec<Command> {
+    let mut commands = Vec::new();
     ui.heading("Explorer");
     let selected = state.selection();
     let view_selection = tree.selected();
@@ -93,11 +98,12 @@ pub fn show(ui: &mut Ui, state: &mut DocumentState, tree: &mut ExplorerTree<Expl
                     _ => {}
                 }
             }
-            state.dispatch(Command::Select(ids)).ok();
+            commands.push(Command::Select(ids));
         }
     }
     if let Some(command) = context_command {
-        state.dispatch(command).ok();
+        commands.push(command);
     }
+    commands
 }
 use std::collections::BTreeSet;

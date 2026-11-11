@@ -204,6 +204,7 @@ impl eframe::App for StarterApp {
             document,
             ui_state,
             metrics,
+            notice,
             file_sender,
             file_busy,
             ..
@@ -212,19 +213,29 @@ impl eframe::App for StarterApp {
             workspace,
             viewport,
             explorer,
+            inspector,
             table,
             analytics,
             gallery,
             ..
         } = ui_state;
-        workspace.show(ui, |panel_ui, pane| match pane {
-            PanelId::Explorer => features::explorer::show(panel_ui, document, explorer),
-            PanelId::Viewport => features::scene::show(panel_ui, document, viewport),
-            PanelId::Inspector => features::inspector::show(panel_ui, document),
-            PanelId::DataTable => features::table::show(panel_ui, document, table),
-            PanelId::Charts => features::analytics::show(panel_ui, analytics, metrics),
-            PanelId::Components => {
-                features::gallery::show(panel_ui, gallery, &mut open_gallery_dialog)
+        workspace.show(ui, |panel_ui, pane| {
+            let commands = match pane {
+                PanelId::Explorer => features::explorer::show(panel_ui, document, explorer),
+                PanelId::Viewport => features::scene::show(panel_ui, document, viewport),
+                PanelId::Inspector => features::inspector::show(panel_ui, document, inspector),
+                PanelId::DataTable => features::table::show(panel_ui, document, table),
+                PanelId::Charts => {
+                    features::analytics::show(panel_ui, analytics, metrics);
+                    Vec::new()
+                }
+                PanelId::Components => {
+                    features::gallery::show(panel_ui, gallery, &mut open_gallery_dialog);
+                    Vec::new()
+                }
+            };
+            for command in commands {
+                commands::dispatch(document, notice, command);
             }
         });
         if open_gallery_dialog && !*file_busy {

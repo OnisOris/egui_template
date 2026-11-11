@@ -50,7 +50,8 @@ impl Camera {
 
     pub fn zoom_at(&mut self, pointer: Pos2, center: Pos2, scroll: f32) {
         let anchor = self.screen_to_world(pointer, center);
-        self.zoom = (self.zoom() * (scroll * 0.001).exp()).clamp(0.08, 8.0);
+        // Matches egui's ctrl+scroll zoom speed (1 / 200 per scroll point).
+        self.zoom = (self.zoom() * (scroll / 200.0).exp()).clamp(0.08, 8.0);
         self.pan = pointer - center - Vec2::new(anchor.x as f32, -anchor.y as f32) * self.zoom;
     }
 

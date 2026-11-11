@@ -7,33 +7,36 @@ pub fn handle(
     ui: &mut Ui,
     response: &Response,
     rect: Rect,
-    state: &mut DocumentState,
+    state: &DocumentState,
     viewport: &mut ViewportState,
-) {
+) -> Vec<Command> {
+    let mut commands = Vec::new();
     let pointer = response.interact_pointer_pos();
     if response.drag_started() {
         viewport.dragging = pointer
             .and_then(|pos| picking::object_at(pos, rect, state.document(), &viewport.camera))
             .map_or(DragTarget::Pan, DragTarget::Object);
         if let DragTarget::Object(id) = viewport.dragging {
-            state.dispatch(Command::Select([id].into())).ok();
+            commands.push(Command::Select([id].into()));
         }
     }
     if response.dragged() {
         let delta = ui.input(|input| input.pointer.delta());
         match viewport.dragging {
             DragTarget::Pan => viewport.camera.pan_by(delta),
-            DragTarget::Object(id) => move_object(state, id, delta, viewport.camera.zoom()),
+            DragTarget::Object(id) => {
+                commands.extend(move_object(state, id, delta, viewport.camera.zoom()));
+            }
         }
     } else if response.clicked() {
         let selected = pointer
             .and_then(|pos| picking::object_at(pos, rect, state.document(), &viewport.camera))
             .into_iter()
             .collect();
-        state.dispatch(Command::Select(selected)).ok();
+        commands.push(Command::Select(selected));
     }
     if response.contains_pointer()
-        && let Some(pointer) = pointer
+        && let Some(pointer) = ui.input(|input| input.pointer.hover_pos())
     {
         let scroll = ui.input(|input| {
             input
@@ -51,20 +54,25 @@ pub fn handle(
                 .sum::<f32>()
         });
         if scroll != 0.0 {
-            viewport.camera.zoom_at(pointer, rect.center(), -scroll);
+            viewport.camera.zoom_at(pointer, rect.center(), scroll);
         }
     }
+    commands
 }
 
-fn move_object(state: &mut DocumentState, id: ObjectId, delta: egui::Vec2, zoom: f32) {
-    if let Some(object) = state.object(id) {
-        let current = object.position();
-        let next = starter_core::Position {
-            x: current.x + delta.x as f64 / zoom as f64,
-            y: current.y - delta.y as f64 / zoom as f64,
-        };
-        state.dispatch(Command::SetPosition(id, next)).ok();
-    }
+fn move_object(
+    state: &DocumentState,
+    id: ObjectId,
+    delta: egui::Vec2,
+    zoom: f32,
+) -> Option<Command> {
+    let object = state.object(id)?;
+    let current = object.position();
+    let next = starter_core::Position {
+        x: current.x + delta.x as f64 / zoom as f64,
+        y: current.y - delta.y as f64 / zoom as f64,
+    };
+    Some(Command::SetPosition(id, next))
 }
 
 #[cfg(test)]
@@ -80,7 +88,8 @@ mod tests {
             .dispatch(Command::AddObject(GroupId::A))
             .unwrap()
             .unwrap();
-        move_object(&mut state, id, egui::vec2(0.0, -20.0), 2.0);
+        let command = move_object(&state, id, egui::vec2(0.0, -20.0), 2.0).unwrap();
+        state.dispatch(command).unwrap();
         assert_eq!(state.object(id).unwrap().position().y, 10.0);
     }
 }

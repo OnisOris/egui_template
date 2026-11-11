@@ -4,7 +4,7 @@ use starter_ui::{Theme, Workspace};
 
 use crate::features::{
     analytics::AnalyticsState, explorer::ExplorerNodeId, gallery::GalleryState,
-    scene::ViewportState, table::TableState,
+    inspector::InspectorState, scene::ViewportState, table::TableState,
 };
 
 pub struct UiState {
@@ -14,6 +14,7 @@ pub struct UiState {
     pub load_size: usize,
     pub viewport: ViewportState,
     pub explorer: starter_ui::ExplorerTree<ExplorerNodeId>,
+    pub inspector: InspectorState,
     pub table: TableState,
     pub analytics: AnalyticsState,
     pub gallery: GalleryState,
@@ -28,6 +29,7 @@ impl Default for UiState {
             load_size: 100,
             viewport: ViewportState::default(),
             explorer: starter_ui::ExplorerTree::default(),
+            inspector: InspectorState::default(),
             table: TableState::default(),
             analytics: AnalyticsState::default(),
             gallery: GalleryState::default(),

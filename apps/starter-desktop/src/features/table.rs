@@ -89,7 +89,8 @@ impl TableState {
     }
 }
 
-pub fn show(ui: &mut Ui, state: &mut DocumentState, table_state: &mut TableState) {
+pub fn show(ui: &mut Ui, state: &DocumentState, table_state: &mut TableState) -> Vec<Command> {
+    let mut commands = Vec::new();
     ui.heading("Data Table");
     ui.horizontal(|ui| {
         ui.label("Filter");
@@ -138,8 +139,9 @@ pub fn show(ui: &mut Ui, state: &mut DocumentState, table_state: &mut TableState
         delegate.clicked
     };
     if let Some(id) = clicked {
-        state.dispatch(Command::Select([id].into())).ok();
+        commands.push(Command::Select([id].into()));
     }
+    commands
 }
 
 struct ObjectTable<'a> {

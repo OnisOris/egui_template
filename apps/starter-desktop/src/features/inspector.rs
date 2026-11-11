@@ -1,18 +1,35 @@
 use eframe::egui::{self, Color32, Ui};
-use starter_core::{Command, DocumentState};
+use starter_core::{Command, DocumentState, ObjectId};
 
-pub fn show(ui: &mut Ui, state: &mut DocumentState) {
+#[derive(Default)]
+pub struct InspectorState {
+    pub(crate) name_draft: Option<(ObjectId, String)>,
+}
+
+pub fn show(ui: &mut Ui, state: &DocumentState, inspector: &mut InspectorState) -> Vec<Command> {
     ui.heading("Inspector");
     let Some(object) = state.selected_object().cloned() else {
+        inspector.name_draft = None;
         ui.add_space(16.0);
         ui.label("Select an object to inspect its properties.");
-        return;
+        return Vec::new();
     };
-    ui.small(format!("ID {}", object.id().0));
+    let mut commands = Vec::new();
     let id = object.id();
-    let mut name = object.name().to_owned();
-    if ui.text_edit_singleline(&mut name).changed() {
-        state.dispatch(Command::SetName(id, name)).ok();
+    ui.small(format!("ID {}", id.0));
+    if inspector
+        .name_draft
+        .as_ref()
+        .is_none_or(|(draft_id, _)| *draft_id != id)
+    {
+        inspector.name_draft = Some((id, object.name().to_owned()));
+    }
+    let (_, name) = inspector
+        .name_draft
+        .as_mut()
+        .expect("draft initialized above");
+    if ui.text_edit_singleline(name).lost_focus() {
+        commands.push(Command::SetName(id, name.clone()));
     }
     let mut x = object.position().x;
     let mut y = object.position().y;
@@ -23,33 +40,30 @@ pub fn show(ui: &mut Ui, state: &mut DocumentState) {
         position_changed |= ui.add(egui::DragValue::new(&mut y).prefix("Y ")).changed();
     });
     if position_changed {
-        state
-            .dispatch(Command::SetPosition(id, starter_core::Position { x, y }))
-            .ok();
+        commands.push(Command::SetPosition(id, starter_core::Position { x, y }));
     }
     let mut size = object.size();
     if ui
         .add(egui::Slider::new(&mut size, 1.0..=200.0).text("Size"))
         .changed()
     {
-        state.dispatch(Command::SetSize(id, size)).ok();
+        commands.push(Command::SetSize(id, size));
     }
     let [r, g, b, a] = object.color();
     let mut color = Color32::from_rgba_unmultiplied(r, g, b, a);
     if ui.color_edit_button_srgba(&mut color).changed() {
-        state
-            .dispatch(Command::SetColor(
-                id,
-                [color.r(), color.g(), color.b(), color.a()],
-            ))
-            .ok();
+        commands.push(Command::SetColor(
+            id,
+            [color.r(), color.g(), color.b(), color.a()],
+        ));
     }
     let mut visible = object.visible();
     if ui.checkbox(&mut visible, "Visible").changed() {
-        state.dispatch(Command::SetVisible(id, visible)).ok();
+        commands.push(Command::SetVisible(id, visible));
     }
     let mut enabled = object.enabled();
     if ui.checkbox(&mut enabled, "Enabled").changed() {
-        state.dispatch(Command::SetEnabled(id, enabled)).ok();
+        commands.push(Command::SetEnabled(id, enabled));
     }
+    commands
 }

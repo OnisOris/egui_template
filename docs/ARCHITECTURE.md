@@ -22,13 +22,15 @@ The dependency direction is application → reusable UI/core. The UI and core cr
 
 ## Action flow
 
-Widgets create a `starter_core::Command`; `DocumentState::dispatch` validates and applies it. Explorer, table, inspector, and viewport all read the same document and selection on the next egui pass. The table stores only an ID projection and an ID-to-vector-index lookup for sorting/filtering and virtual rows; it does not hold a second object model. Field revisions avoid rebuilding a 10k-row projection for unrelated edits.
+Widget panels return `starter_core::Command` values instead of mutating the document themselves. `StarterApp` routes every command through `commands::dispatch`, so validation, notices, and future undo/redo live in one place. Explorer, table, inspector, and viewport all read the same document and selection. The table stores only an ID projection and an ID-to-vector-index lookup for sorting/filtering and virtual rows; it does not hold a second object model. Field revisions avoid rebuilding a 10k-row projection for unrelated edits.
 
 ```text
-Inspector edit -> SetPosition(id, value) -> DocumentState -> Explorer/Table/Viewport
+Inspector edit -> Command -> commands::dispatch -> DocumentState -> Explorer/Table/Viewport
 ```
 
-Menu, toolbar, and keyboard shortcuts produce the same `AppAction` and call the same application handler. Document JSON is validated before `ReplaceDocument` is dispatched.
+The inspector keeps the name field in a local draft and commits it on Enter or focus loss, so validation errors never destroy what the user typed.
+
+Menu, toolbar, and keyboard shortcuts produce the same `AppAction` and call the same application handler. Document JSON is validated before `ReplaceDocument` is dispatched. Saving writes to a sibling temporary file and renames it over the target, so an interrupted save leaves the previous document intact.
 
 ## Lifecycle and persistence
 

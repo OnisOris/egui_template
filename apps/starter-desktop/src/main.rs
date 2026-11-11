@@ -6,6 +6,9 @@ mod services;
 mod state;
 mod workspace;
 
+#[cfg(test)]
+mod chain;
+
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
