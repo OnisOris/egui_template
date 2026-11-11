@@ -12,6 +12,7 @@ pub fn show(
     viewport: &mut ViewportState,
     document: &mut DocumentState,
     notice: &mut Option<String>,
+    demo: bool,
 ) {
     let (rect, response) = ui.allocate_exact_size(ui.available_size(), Sense::click_and_drag());
     let pixels_per_point = ui.ctx().pixels_per_point();
@@ -64,7 +65,10 @@ pub fn show(
                     to_vec2(rect.size()),
                     aspect,
                 );
-                match picking::pick_object(document, &ray) {
+                match (!demo)
+                    .then(|| picking::pick_object(document, &ray))
+                    .flatten()
+                {
                     Some(id) => {
                         let (center, start_position) = {
                             let object = document.object(id).expect("picked object exists");
@@ -126,7 +130,8 @@ pub fn show(
         viewport.drag = None;
     }
 
-    if response.clicked()
+    if !demo
+        && response.clicked()
         && let Some(pointer) = local
     {
         let ray = screen_ray(
@@ -143,7 +148,8 @@ pub fn show(
         apply(document, notice, command);
     }
 
-    if response.double_clicked()
+    if !demo
+        && response.double_clicked()
         && let Some(pointer) = local
     {
         let ray = screen_ray(

@@ -118,14 +118,14 @@ impl OrbitCamera {
                 fov: FOV,
                 aspect_ratio: aspect,
                 near: 0.05,
-                far: 100_000.0,
+                far: self.max_distance.max(100_000.0) * 2.0,
                 ..default()
             }),
             ProjectionMode::Orthographic => {
                 let half_height = self.distance * (FOV * 0.5).tan();
                 Projection::Orthographic(OrthographicProjection {
                     near: 0.0,
-                    far: 100_000.0,
+                    far: self.max_distance.max(100_000.0) * 2.0,
                     scale: 2.0 * half_height / viewport_height.max(1.0),
                     ..OrthographicProjection::default_3d()
                 })

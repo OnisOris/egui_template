@@ -19,15 +19,37 @@ pub mod chrome;
 pub mod gallery;
 pub mod panels;
 
-pub fn editor_ui(
+#[derive(bevy::ecs::system::SystemParam)]
+pub(crate) struct MapUi<'w> {
+    picker: NonSendMut<'w, crate::map::picker::MapPicker>,
+    active: ResMut<'w, crate::map::region::ActiveMapRegion>,
+    runtime: ResMut<'w, crate::map::RegionRuntime>,
+}
+
+#[derive(bevy::ecs::system::SystemParam)]
+pub(crate) struct RenderUi<'w, 's> {
+    images: ResMut<'w, Assets<Image>>,
+    cameras: Query<'w, 's, &'static mut RenderTarget, With<ViewportCamera>>,
+}
+
+pub(crate) fn editor_ui(
     mut contexts: EguiContexts,
+    map: MapUi,
     mut ui_state: ResMut<UiState>,
     mut document: ResMut<DocumentResource>,
     mut viewport: ResMut<ViewportState>,
     mut metrics: ResMut<EditorMetrics>,
-    mut images: ResMut<Assets<Image>>,
-    mut cameras: Query<&mut RenderTarget, With<ViewportCamera>>,
+    targets: RenderUi,
 ) -> Result {
+    let MapUi {
+        mut picker,
+        mut active,
+        mut runtime,
+    } = map;
+    let RenderUi {
+        mut images,
+        mut cameras,
+    } = targets;
     let started = Instant::now();
     let projection = viewport.camera.projection;
     let actions;
@@ -65,6 +87,9 @@ pub fn editor_ui(
         commands = panels::show(
             &mut root,
             panels::Panels {
+                picker: &mut picker,
+                active: &mut active,
+                runtime: &mut runtime,
                 workspace,
                 explorer,
                 inspector,
@@ -78,12 +103,23 @@ pub fn editor_ui(
         );
     }
 
+    let viewport_drawn = viewport.requested_size.is_some();
     viewport::target::apply_pending_resize(&mut contexts, &mut images, &mut viewport, &mut cameras);
+    if viewport_drawn && viewport.fit_demo_pending {
+        crate::map::demo::focus_demo(&mut viewport);
+        viewport.fit_demo_pending = false;
+    }
     for command in commands {
         dispatch(&mut document, &mut ui_state.notice, command);
     }
     for action in actions {
-        apply(action, &mut ui_state, &mut document, &mut viewport);
+        apply(
+            action,
+            &mut ui_state,
+            &mut document,
+            &mut viewport,
+            &mut runtime,
+        );
     }
     metrics.ui_ms = started.elapsed().as_secs_f32() * 1000.0;
     Ok(())
@@ -94,7 +130,23 @@ fn apply(
     ui_state: &mut UiState,
     document: &mut DocumentResource,
     viewport: &mut ViewportState,
+    runtime: &mut crate::map::RegionRuntime,
 ) {
+    if runtime.showing_demo
+        && matches!(
+            action,
+            EditorAction::ResetView | EditorAction::FocusSelection
+        )
+    {
+        crate::map::demo::focus_demo(viewport);
+        return;
+    }
+    if matches!(
+        action,
+        EditorAction::New | EditorAction::SetLoad(_) | EditorAction::AddObject
+    ) {
+        runtime.showing_demo = false;
+    }
     match action {
         EditorAction::New => {
             dispatch(document, &mut ui_state.notice, Command::NewDocument);
@@ -116,7 +168,10 @@ fn apply(
             }
         }
         EditorAction::ResetView => viewport.camera.reset(bounds(document)),
-        EditorAction::ResetLayout => ui_state.workspace.reset(),
+        EditorAction::ResetLayout => {
+            ui_state.workspace.reset();
+            ui_state.workspace.ensure_panel(starter_ui::PanelId::Map);
+        }
         EditorAction::ToggleProjection => viewport.camera.projection.toggle(),
         EditorAction::ToggleTheme => {
             ui_state.theme = match ui_state.theme {

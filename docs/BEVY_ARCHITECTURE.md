@@ -4,23 +4,19 @@
 
 | Component | Version | Why |
 |---|---|---|
-| Bevy | 0.19.1 | Chosen starting point; supported by `bevy_egui` 0.42. |
-| bevy_egui | 0.42.0 | Render-to-texture API used by the viewport. |
-| egui | 0.36.2 | `bevy_egui` 0.42 and 0.43 both depend on egui 0.36, so the whole UI stack is pinned here. |
-| eframe | 0.36.2 | Keeps `starter-desktop` on the same egui version. |
+| Bevy | 0.20.1 | Latest stable engine. |
+| bevy_egui | 0.43.1 | Latest stable integration; requires egui 0.36. |
+| egui / eframe / egui_kittest | 0.36.2 | Last compatible UI line. |
 | egui_tiles | 0.17.1 | Docking compatible with egui 0.36. |
 | egui_ltreeview | 0.9.0 | Explorer tree compatible with egui 0.36. |
 | egui_table | 0.10.0 | Data table compatible with egui 0.36. |
 | egui_plot | 0.37.0 | Charts compatible with egui 0.36. |
-| egui_kittest | 0.36.2 | GUI tests for the existing desktop app. |
+| Walkers | 0.62.0 | Raster map widget compatible with egui 0.36. |
 
-Bevy 0.20.1 + `bevy_egui` 0.43.1 was evaluated. It uses the same egui 0.36
-line, so it does not remove the UI downgrade; it only moves the engine one
-release forward. 0.19.1 was kept because it is the requested baseline and the
-viewport integration is identical.
-
-One egui version exists in each binary. `scripts/check.sh` enforces that the
-workspace resolves only `egui v0.36.2`.
+Versions were checked on 2026-11-11. The egui 0.37 stack cannot yet be used
+with released bevy_egui without incompatible duplicate egui types or a fork.
+See [MAP_PICKER.md](MAP_PICKER.md) for the complete compatibility matrix.
+`scripts/check.sh` enforces that the workspace resolves only `egui v0.36.2`.
 
 ## Crates
 
@@ -48,20 +44,25 @@ BevyEditorPlugin composition (src/lib.rs)
 │   ├── setup_viewport       render-to-texture camera + primary egui camera
 │   ├── apply_camera         orbit state -> Transform/Projection
 │   └── target               image allocation and Egui texture bookkeeping
+├── MapPlugin
+│   ├── MapPicker            Walkers view + draft selection (non-send)
+│   ├── ActiveMapRegion      sole confirmed bbox/origin + revision
+│   └── demo::open_region    explicit request -> replace demo meshes
 └── EguiPrimaryContextPass
     └── editor_ui            menu, toolbar, docking, panels, status bar
 ```
 
-`ViewportPlugin` is the only part that knows about rendering. `ScenePlugin`
-owns the document-to-ECS projection. `editor_ui` never creates a second window
+`ViewportPlugin` owns the shared viewport camera and render target. `ScenePlugin`
+owns the document-to-ECS projection; `MapPlugin` owns the optional demo terrain. `editor_ui` never creates a second window
 or a nested eframe loop.
 
 ## One native window
 
 Two cameras are used:
 
-1. **Viewport camera** — order -1, `RenderTarget::Image`, `RenderLayers::layer(1)`.
-   It renders the 3D scene and the grid into the viewport texture.
+1. **Viewport camera** — order -1, `RenderTarget::Image`, `RenderLayers::layer(1)`
+   for the editor or layer 2 for demo terrain. It renders the chosen scene and
+   grid into the viewport texture.
 2. **Primary egui camera** — order 0, default render layer, carries
    `PrimaryEguiContext`. It clears the window and renders egui on top. No 3D
    content is on its render layer.
@@ -115,6 +116,8 @@ grid gizmos, so selection changes do not respawn meshes.
 
 ## Input routing
 
+Map input and selection are described in [MAP_PICKER.md](MAP_PICKER.md).
+In the demo scene LMB always orbits, so it cannot pick hidden editor objects.
 Camera control runs only from egui `Response` methods on the viewport widget:
 
 - LMB on an object: select and drag it in the horizontal plane;

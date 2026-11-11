@@ -37,7 +37,7 @@ fn setup_scene(
             ..default()
         },
         Transform::from_xyz(300.0, 600.0, 200.0).looking_at(Vec3::ZERO, Vec3::Y),
-        RenderLayers::layer(1),
+        RenderLayers::from_layers(&[1, 2]),
     ));
     commands.spawn((
         Mesh3d(meshes.add(Plane3d::default().mesh().size(20_000.0, 20_000.0))),

@@ -45,3 +45,6 @@ The same checks run in GitHub Actions on every push and pull request. They inclu
 - `starter-bevy`: Bevy ECS scene projection, embedded 3D viewport, camera, picking, and egui editor shell.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/BEVY_ARCHITECTURE.md](docs/BEVY_ARCHITECTURE.md), [docs/COMPONENTS.md](docs/COMPONENTS.md), and [docs/EXTENDING.md](docs/EXTENDING.md) before extending the template.
+
+The Bevy application includes an interactive Map Picker and synthetic terrain preview.
+See [docs/MAP_PICKER.md](docs/MAP_PICKER.md) for controls, versions and limits.

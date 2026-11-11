@@ -37,7 +37,16 @@ pub struct UiState {
 impl Default for UiState {
     fn default() -> Self {
         Self {
-            workspace: Workspace::default(),
+            workspace: {
+                let mut workspace = crate::layout::load().unwrap_or_else(|| {
+                    let mut workspace = Workspace::default();
+                    workspace.ensure_panel(starter_ui::PanelId::Map);
+                    workspace.activate(starter_ui::PanelId::Map);
+                    workspace
+                });
+                workspace.ensure_panel(starter_ui::PanelId::Map);
+                workspace
+            },
             theme: Theme::Dark,
             explorer: ExplorerTree::default(),
             inspector: InspectorState::default(),

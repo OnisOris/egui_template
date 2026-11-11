@@ -36,7 +36,10 @@ pub fn show(ui: &mut Ui, workspace: &mut Workspace) -> Vec<AppAction> {
                     ui.close();
                 }
                 ui.separator();
-                for panel in PanelId::ALL {
+                for panel in PanelId::ALL
+                    .into_iter()
+                    .filter(|panel| *panel != PanelId::Map)
+                {
                     let mut visible = workspace.is_visible(panel);
                     if ui.checkbox(&mut visible, panel.title()).changed() {
                         workspace.set_visible(panel, visible);

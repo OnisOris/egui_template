@@ -3,6 +3,8 @@ use bevy::window::PresentMode;
 use bevy_egui::{EguiGlobalSettings, EguiPlugin, EguiPrimaryContextPass};
 use starter_core::{Command, TEST_LOADS};
 
+mod layout;
+pub mod map;
 pub mod metrics;
 pub mod scene;
 pub mod state;
@@ -47,7 +49,7 @@ pub fn build() -> App {
     app.insert_resource(document)
         .init_resource::<EditorMetrics>()
         .init_resource::<UiState>()
-        .add_plugins((ScenePlugin, ViewportPlugin))
+        .add_plugins((ScenePlugin, ViewportPlugin, map::MapPlugin))
         .add_systems(
             Update,
             (
@@ -56,6 +58,7 @@ pub fn build() -> App {
                 metrics::log_bench,
             ),
         )
-        .add_systems(EguiPrimaryContextPass, ui::editor_ui);
+        .add_systems(EguiPrimaryContextPass, ui::editor_ui)
+        .add_systems(Last, layout::save_on_exit.after(bevy::window::ExitSystems));
     app
 }
