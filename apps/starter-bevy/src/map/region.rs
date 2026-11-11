@@ -4,7 +4,7 @@ use bevy::prelude::Resource;
 pub const MERCATOR_LATITUDE: f64 = 85.051_128_779_806_6;
 pub const EARTH_RADIUS: f64 = 6_378_137.0;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct GeoOrigin {
     pub longitude: f64,
     pub latitude: f64,
@@ -24,7 +24,7 @@ impl GeoOrigin {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct GeoBounds {
     pub west: f64,
     pub south: f64,
@@ -74,7 +74,7 @@ impl GeoBounds {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct MapRegion {
     pub bounds: GeoBounds,
     /// Independent of bbox: a future adapter can supply a fixed home outside the region.

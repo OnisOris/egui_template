@@ -12,22 +12,19 @@ pub fn show(
     picker: &mut MapPicker,
     active: &mut ActiveMapRegion,
     runtime: &mut RegionRuntime,
+    import: &mut super::loading::TerrainImport,
+    scene: &super::real_scene::RealScene,
 ) -> bool {
     let mut open = false;
     egui::Panel::top("map_tools").show(ui, |ui| {
         ui.heading("Map · Region picker");
         search_bar(ui, picker);
     });
-    let details_height = (ui.available_height() * 0.25).clamp(48.0, 112.0);
-    egui::Panel::bottom("map_region")
-        .exact_size(details_height)
+    egui::ScrollArea::vertical()
+        .id_salt("map_region_controls")
+        .max_height(260.0)
         .show(ui, |ui| {
-            // Keep details usable even in a short docking pane.
-            egui::ScrollArea::vertical()
-                .max_height(160.0)
-                .show(ui, |ui| {
-                    open = region_details(ui, picker, active, runtime);
-                });
+            open = region_details(ui, picker, active, runtime, import, scene);
         });
     egui::Panel::bottom("map_attribution")
         .min_size(38.0)
@@ -76,6 +73,8 @@ fn region_details(
     picker: &mut MapPicker,
     active: &mut ActiveMapRegion,
     runtime: &mut RegionRuntime,
+    import: &mut super::loading::TerrainImport,
+    scene: &super::real_scene::RealScene,
 ) -> bool {
     let preview = picker.selection.preview;
     if let Some(b) = preview.or_else(|| active.get().map(|(_, r)| r.bounds)) {
@@ -103,8 +102,28 @@ fn region_details(
     } else {
         ui.label("Pan and zoom to a place, then use Select Region to draw a rectangle.");
     }
-    let mut open = false;
+    let mut return_open = false;
     ui.horizontal_wrapped(|ui| {
+        if ui
+            .add_enabled(
+                preview.is_some() && picker.selection.drag_start.is_none(),
+                egui::Button::new("Confirm Region")
+                    .min_size(egui::vec2(140.0, 30.0))
+                    .fill(ui.visuals().selection.bg_fill),
+            )
+            .clicked()
+            && let Some(bounds) = preview
+        {
+            match MapRegion::new(
+                bounds,
+                picker.selection.origin.unwrap_or_else(|| bounds.center()),
+            )
+            .and_then(|r| active.confirm(r))
+            {
+                Ok(()) => picker.selection.clear(),
+                Err(error) => picker.selection.error = Some(error.into()),
+            }
+        }
         if ui
             .add_enabled(
                 preview.is_some() || picker.selection.error.is_some(),
@@ -123,38 +142,55 @@ fn region_details(
         {
             picker.view.fit_requested = true;
         }
+    });
+    ui.horizontal_wrapped(|ui| {
         if ui
             .add_enabled(
-                preview.is_some() && picker.selection.drag_start.is_none(),
-                egui::Button::new("Confirm Region"),
+                active.get().is_some() && preview.is_none() && !import.loading(),
+                egui::Button::new("Open in 3D")
+                    .min_size(egui::vec2(140.0, 30.0))
+                    .fill(ui.visuals().selection.bg_fill),
             )
             .clicked()
-            && let Some(bounds) = preview
         {
-            match MapRegion::new(bounds, bounds.center()).and_then(|r| active.confirm(r)) {
-                Ok(()) => picker.selection.clear(),
-                Err(error) => picker.selection.error = Some(error.into()),
-            }
+            runtime.real_requested = true;
+            return_open = true;
+        }
+        if ui.button("Import DEM…").clicked() {
+            import.start(active, None, scene.fingerprint());
         }
         if ui
-            .add_enabled(active.get().is_some(), egui::Button::new("Open in 3D"))
+            .add_enabled(active.get().is_some(), egui::Button::new("Demo"))
             .clicked()
             && let Some((_, region)) = active.get()
         {
             match super::demo::validate_demo(region) {
                 Ok(()) => {
                     runtime.open_requested = true;
-                    open = true;
+                    return_open = true;
                 }
                 Err(error) => picker.selection.error = Some(error.into()),
             }
         }
     });
+    if let Some(package) = &import.prepared {
+        let m = &package.data.manifest;
+        if active.get().is_none_or(|(_, r)| !m.matches(r)) {
+            ui.label("Package has a different bbox/origin. Review its area before opening.");
+            if ui.button("Use package area").clicked() {
+                picker.selection.preview = Some(m.bbox);
+                picker.selection.origin = Some(m.origin);
+                picker.selection.error = None;
+                picker.view.fit_requested = true;
+            }
+        }
+    }
+    super::controls::status(ui, active, import, scene);
     if let Some((revision, _)) = active.get() {
-        ui.small(format!("Confirmed revision {revision} · Open in 3D uses this revision. Terrain is synthetic, not real elevations."));
+        ui.small(format!("Confirmed revision {revision} · Open in 3D uses this region. Demo is explicitly synthetic."));
     }
     if let Some(error) = &picker.selection.error {
         ui.colored_label(ui.visuals().error_fg_color, error);
     }
-    open
+    return_open
 }

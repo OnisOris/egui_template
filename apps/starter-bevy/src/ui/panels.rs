@@ -15,6 +15,8 @@ pub struct Panels<'a> {
     pub picker: &'a mut crate::map::picker::MapPicker,
     pub active: &'a mut crate::map::region::ActiveMapRegion,
     pub runtime: &'a mut crate::map::RegionRuntime,
+    pub import: &'a mut crate::map::loading::TerrainImport,
+    pub real: &'a mut crate::map::real_scene::RealScene,
     pub workspace: &'a mut Workspace,
     pub explorer: &'a mut ExplorerTree<ExplorerNodeId>,
     pub inspector: &'a mut InspectorState,
@@ -31,6 +33,8 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
         picker,
         active,
         runtime,
+        import,
+        real,
         workspace,
         explorer,
         inspector,
@@ -48,26 +52,31 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
     workspace.show(ui, |panel_ui, pane| match pane {
         PanelId::Map => {
             map_visible = true;
-            open = crate::map::ui::show(panel_ui, picker, active, runtime);
+            open = crate::map::ui::show(panel_ui, picker, active, runtime, import, real);
         }
         PanelId::Explorer => {
             commands.extend(show_explorer(panel_ui, document, explorer));
         }
         PanelId::Viewport => {
             viewport_visible = true;
-            if runtime.showing_demo {
-                panel_ui.horizontal(|ui| {
-                    ui.label("Synthetic terrain · east X / up Y / south Z");
-                    if ui.button("Editor scene").clicked() {
-                        runtime.showing_demo = false;
-                        viewport
-                            .camera
-                            .reset(crate::scene::objects::bounds(document));
-                        viewport.drag = None;
-                    }
-                });
+            {
+                let mode = runtime.mode;
+                crate::map::controls::viewport_bar(
+                    panel_ui, viewport, runtime, active, import, real,
+                );
+                if mode != runtime.mode && runtime.mode == crate::map::SceneMode::Editor {
+                    viewport
+                        .camera
+                        .reset(crate::scene::objects::bounds(document));
+                }
             }
-            viewport::input::show(panel_ui, viewport, document, notice, runtime.showing_demo);
+            viewport::input::show(
+                panel_ui,
+                viewport,
+                document,
+                notice,
+                runtime.mode != crate::map::SceneMode::Editor,
+            );
         }
         PanelId::Inspector => {
             commands.extend(show_inspector(panel_ui, document, inspector));

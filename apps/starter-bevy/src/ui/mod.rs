@@ -24,6 +24,8 @@ pub(crate) struct MapUi<'w> {
     picker: NonSendMut<'w, crate::map::picker::MapPicker>,
     active: ResMut<'w, crate::map::region::ActiveMapRegion>,
     runtime: ResMut<'w, crate::map::RegionRuntime>,
+    import: ResMut<'w, crate::map::loading::TerrainImport>,
+    real: ResMut<'w, crate::map::real_scene::RealScene>,
 }
 
 #[derive(bevy::ecs::system::SystemParam)]
@@ -45,6 +47,8 @@ pub(crate) fn editor_ui(
         mut picker,
         mut active,
         mut runtime,
+        mut import,
+        mut real,
     } = map;
     let RenderUi {
         mut images,
@@ -90,6 +94,8 @@ pub(crate) fn editor_ui(
                 picker: &mut picker,
                 active: &mut active,
                 runtime: &mut runtime,
+                import: &mut import,
+                real: &mut real,
                 workspace,
                 explorer,
                 inspector,
@@ -105,9 +111,9 @@ pub(crate) fn editor_ui(
 
     let viewport_drawn = viewport.requested_size.is_some();
     viewport::target::apply_pending_resize(&mut contexts, &mut images, &mut viewport, &mut cameras);
-    if viewport_drawn && viewport.fit_demo_pending {
-        crate::map::demo::focus_demo(&mut viewport);
-        viewport.fit_demo_pending = false;
+    if viewport_drawn && viewport.fit_geo_pending {
+        crate::viewport::focus_geo(&mut viewport);
+        viewport.fit_geo_pending = false;
     }
     for command in commands {
         dispatch(&mut document, &mut ui_state.notice, command);
@@ -132,20 +138,20 @@ fn apply(
     viewport: &mut ViewportState,
     runtime: &mut crate::map::RegionRuntime,
 ) {
-    if runtime.showing_demo
+    if runtime.mode != crate::map::SceneMode::Editor
         && matches!(
             action,
             EditorAction::ResetView | EditorAction::FocusSelection
         )
     {
-        crate::map::demo::focus_demo(viewport);
+        crate::viewport::focus_geo(viewport);
         return;
     }
     if matches!(
         action,
         EditorAction::New | EditorAction::SetLoad(_) | EditorAction::AddObject
     ) {
-        runtime.showing_demo = false;
+        runtime.mode = crate::map::SceneMode::Editor;
     }
     match action {
         EditorAction::New => {

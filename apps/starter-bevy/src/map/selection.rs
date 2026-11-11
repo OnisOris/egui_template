@@ -5,6 +5,7 @@ use walkers::{Position, Projector, lon_lat};
 #[derive(Default)]
 pub struct RegionSelectionState {
     pub preview: Option<GeoBounds>,
+    pub origin: Option<GeoOrigin>,
     pub cursor: Option<GeoOrigin>,
     pub drag_start: Option<Position>,
     pub error: Option<String>,
@@ -13,6 +14,7 @@ pub struct RegionSelectionState {
 impl RegionSelectionState {
     pub fn clear(&mut self) {
         self.preview = None;
+        self.origin = None;
         self.drag_start = None;
         self.error = None;
     }

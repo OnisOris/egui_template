@@ -5801,11 +5801,15 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_egui",
+ "blake3",
  "directories",
  "egui_kittest",
+ "rfd",
+ "serde",
  "serde_json",
  "starter-core",
  "starter-ui",
+ "tempfile",
  "walkers",
 ]
 

@@ -113,25 +113,14 @@ pub fn open_region(
         scene.materials = vec![ground_material, line_material, object_material];
         scene.revision = Some(revision);
     }
-    runtime.showing_demo = true;
+    runtime.mode = super::SceneMode::Demo;
     viewport.drag = None;
-    viewport.demo_bounds = Some(SceneBounds {
+    viewport.scene_bounds = Some(SceneBounds {
         center: (min + max) * 0.5,
         radius: (max - min).length() * 0.5,
     });
-    focus_demo(&mut viewport);
-    viewport.fit_demo_pending = true;
-}
-
-pub fn focus_demo(viewport: &mut ViewportState) {
-    let Some(bounds) = viewport.demo_bounds else {
-        return;
-    };
-    let aspect = viewport.size.x as f32 / viewport.size.y.max(1) as f32;
-    let camera = &mut viewport.camera;
-    camera.reset(bounds);
-    camera.max_distance = bounds.radius * 20.0;
-    camera.distance = (bounds.radius * 3.0 / aspect.clamp(0.1, 1.0)).min(camera.max_distance);
+    crate::viewport::focus_geo(&mut viewport);
+    viewport.fit_geo_pending = true;
 }
 
 #[cfg(test)]
