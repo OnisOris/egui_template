@@ -1,4 +1,4 @@
-# Real terrain packages (M1)
+# Real terrain and satellite packages (M1 / M2)
 
 The template is a read-only viewer, not a geographic data downloader. It has no
 UAV workspace/path dependency and never modifies the UAV project or its cache.
@@ -9,7 +9,9 @@ UAV workspace/path dependency and never modifies the UAV project or its cache.
 2. If bbox/origin differs, review Use package area and Confirm Region explicitly.
    This preserves fixed package home origins, including those outside the bbox.
 3. Open in 3D installs Real DEM. Demo remains a separately labelled button.
-4. Viewport: Reset Camera, Fit Terrain and Grid. A pending/new confirmed region
+4. Viewport: Import Satellite… optionally selects a matching map-data folder.
+   Terrain / Satellite switches material without rebuilding geometry.
+5. Viewport: Reset Camera, Fit Terrain and Grid. A pending/new confirmed region
    does not silently replace the visible scene; a previous-region warning remains.
 
 The optional `STARTER_TERRAIN_PACKAGE=/path/to/package` environment variable
@@ -63,7 +65,7 @@ Bevy uses its existing camera, image RenderTarget, Mesh and StandardMaterial.
 Editor, Demo and Real DEM use separate RenderLayers. Loading does not touch the
 test-object document. A BLAKE3 content identity prevents unnecessary geometry
 replacement on reopening an unchanged package. Replacing a package explicitly
-removes old entities, meshes and materials. Camera fitting uses actual 3D bounds
+removes old entities, meshes, materials and satellite images. Camera fitting uses actual 3D bounds
 including relative elevations and the current dock aspect ratio.
 
 ## Verification and future source
@@ -89,3 +91,62 @@ Native Linux GUI automation exercised package area → Confirm → Open in 3D;
 the 1025×562 real DEM rendered with the draped grid in the docked viewport.
 The isolated X11 smoke test used Xvfb + Mesa lavapipe after the interactive
 Wayland session ended. Synthetic mouse input is not a human UX review.
+
+## Satellite package and georeference
+
+Supported map-data format: v2. Only `manifest.json` and `satellite.jpg` are read;
+roads/buildings are ignored and need not exist. The bbox and fixed origin must
+match the loaded DEM and current confirmed revision. JPEG decoding and per-vertex
+UV preparation use a Bevy Task. Results are discarded if either the region
+revision or the DEM content fingerprint changed. An error preserves the last
+valid scene; a DEM works without satellite data.
+
+`SatellitePayload` contains decoded RGBA, provenance and UV attributes, no second
+height model. Walkers' public Mercator projection supplies global pixel positions;
+tileSize scales its 256-pixel convention. UV = (global pixel − cropPixelBounds
+left/top) / crop extent. V increases south/down, matching JPEG rows. Rounded crop
+bounds may include pixels outside the DEM bbox. Mapping the DEM to a plain 0..1
+rectangle would shift the image and is deliberately avoided.
+
+Limits: JPEG file 64 MiB, metadata 1 MiB, at most 16,777,216 decoded pixels and
+8192 per edge. Integer crop bounds must agree with decoded dimensions, zoom,
+tile size and cover the DEM. Malformed/mismatched packages are rejected. This
+fixed-resolution viewer does not resample oversized images or stream textures.
+
+Bevy stores one linear-filtered sRGB image. Initial satellite installation adds
+UV attributes to the existing meshes; positions, normals, indices, entities and
+handles stay unchanged. Terrain/Satellite only changes the existing material's
+texture and tint. Reimporting identical content reuses the image. Replacing a DEM
+releases its satellite image, and replacing satellite content releases the old
+image. Viewport resizing only changes the existing render target.
+
+The provider attribution from the package appears below the viewport controls.
+The viewer grants no new imagery rights: use packages permitted by the original
+provider's terms; no downloader, API keys or bulk tile cache is included.
+
+Optional reproducible startup: `STARTER_SATELLITE_PACKAGE=/path/to/map-data`
+imports once after a DEM is opened, through the same validated background path.
+For local real DEM/satellite lifecycle checks:
+
+```bash
+STARTER_TEST_TERRAIN_ROOT=/path/to/terrain-cache/packages \
+STARTER_TEST_MAP_ROOT=/path/to/map-data-cache/packages cargo test --workspace
+```
+
+These checks cycle three matched real packages three times and repeatedly toggle
+materials, asserting stable mesh/entity/material counts and image release.
+The independent fixtures exercise offset crop UVs, shared edges, V direction,
+JPEG dimensions/corruption, mismatched origins, unsupported versions and stale
+requests. CI requires no private project, cache, imagery or network.
+
+Libraries remain Bevy 0.20.1 / bevy_egui 0.43.1 / egui 0.36.2 / Walkers 0.62.0;
+JPEG uses image 0.25.10 (already present transitively), dialogs rfd 0.18.0 and
+content identity BLAKE3 1.8.7. No fork or additional GIS engine is introduced.
+
+M2 verification: all 66 workspace tests pass (the original 52 plus 14 new tests),
+including three real DEM/satellite pairs cycled three times. `cargo fmt --all
+--check`, strict workspace clippy, tests, workspace release build and the full
+`scripts/check.sh` pass. Native Linux X11/Vulkan automation rendered the real
+1025×562 DEM with a matching 3305×1809 Esri package and provider attribution.
+The original starter-desktop also starts. GUI evidence uses isolated Xvfb and
+Mesa lavapipe, not a human UX or hardware-performance review.

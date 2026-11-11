@@ -28,20 +28,33 @@ pub fn viewport_bar(
     viewport: &mut ViewportState,
     runtime: &mut RegionRuntime,
     active: &ActiveMapRegion,
-    import: &mut TerrainImport,
+    imports: (
+        &mut TerrainImport,
+        &mut super::satellite_scene::SatelliteImport,
+    ),
     scene: &mut RealScene,
 ) {
+    let (import, satellite) = imports;
     ui.horizontal_wrapped(|ui| {
         ui.strong(match runtime.mode {
             SceneMode::Demo => "Demo · synthetic",
+            SceneMode::Real if scene.satellite_enabled => "Real DEM · Satellite",
             SceneMode::Real => "Real DEM · Terrain",
             SceneMode::Editor => "Editor",
         });
         if runtime.mode == SceneMode::Real {
             if let Some(data) = &scene.data {
-                ui.label(&data.manifest.source);
+                ui.label(&data.manifest.source)
+                    .on_hover_text(&data.manifest.attribution);
             }
             ui.checkbox(&mut scene.grid_enabled, "Grid");
+            ui.selectable_value(&mut scene.satellite_enabled, false, "Terrain");
+            ui.add_enabled_ui(scene.satellite.is_some(), |ui| {
+                ui.selectable_value(&mut scene.satellite_enabled, true, "Satellite");
+            });
+            if ui.small_button("Import Satellite…").clicked() {
+                satellite.start(active, scene, None);
+            }
         }
         if ui
             .add_enabled(
@@ -85,6 +98,21 @@ pub fn viewport_bar(
                 "Previous region remains visible. Import and open the new region to replace it.",
             );
         }
+    }
+    if satellite.loading() {
+        ui.label("Loading satellite JPEG… UI remains available.");
+    }
+    if let Some(error) = &satellite.error {
+        ui.colored_label(
+            ui.visuals().error_fg_color,
+            format!("Satellite error · {error}"),
+        );
+    }
+    if runtime.mode == SceneMode::Real
+        && scene.satellite_enabled
+        && let Some(loaded) = &scene.satellite
+    {
+        ui.small(&loaded.manifest.satellite.attribution);
     }
     if import.loading() || import.error.is_some() || runtime.mode == SceneMode::Editor {
         status(ui, active, import, scene);

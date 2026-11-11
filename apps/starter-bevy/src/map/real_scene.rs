@@ -14,6 +14,8 @@ pub struct RealScene {
     pub data: Option<Arc<TerrainPayload>>,
     pub revision: Option<u64>,
     pub grid_enabled: bool,
+    pub satellite: Option<super::satellite_scene::InstalledSatellite>,
+    pub satellite_enabled: bool,
     pub entities: Vec<Entity>,
     pub meshes: Vec<Handle<Mesh>>,
     pub materials: Vec<Handle<StandardMaterial>>,
@@ -24,6 +26,8 @@ impl Default for RealScene {
             data: None,
             revision: None,
             grid_enabled: true,
+            satellite: None,
+            satellite_enabled: false,
             entities: Vec::new(),
             meshes: Vec::new(),
             materials: Vec::new(),
@@ -42,6 +46,7 @@ impl RealScene {
 #[derive(bevy::ecs::system::SystemParam)]
 pub struct SceneAssets<'w> {
     pub meshes: ResMut<'w, Assets<Mesh>>,
+    pub images: ResMut<'w, Assets<Image>>,
     pub materials: ResMut<'w, Assets<StandardMaterial>>,
 }
 
@@ -83,6 +88,10 @@ pub fn open_real(
             import.error = Some("Cached geometry changed. Import the package again.".into());
             return;
         }
+        if let Some(satellite) = scene.satellite.take() {
+            assets.images.remove(satellite.image.id());
+        }
+        scene.satellite_enabled = false;
         for entity in scene.entities.drain(..) {
             commands.entity(entity).despawn();
         }

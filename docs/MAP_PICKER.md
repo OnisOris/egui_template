@@ -73,9 +73,9 @@ These are UI estimates, not cadastral/geodesic survey measurements.
 Origin defaults to the bbox center on confirmation. It is independent of the
 bbox in the contract and may later be supplied by a fixed home outside it.
 `coordinates.rs` is the only local conversion: domain X east, Y south, Z up;
-Bevy X east, Y up, Z south. The local tangent approximation is deliberately
-limited to demonstration use. Screen projection/unprojection and zoom are
-entirely Walkers' responsibility.
+Bevy X east, Y up, Z south. The local approximation follows
+the UAV v1 convention (111320 m/degree, scaled by cos(origin latitude)).
+Screen projection/unprojection and zoom are entirely Walkers' responsibility.
 
 ## Input, tiles and failure handling
 
@@ -119,8 +119,8 @@ Nothing rebuilds each frame, on selection, or on Confirm.
 
 Demo sides must be 1 m–100 km; the demo origin must be within 1000 km of its
 center. Geographic selection itself is not restricted to that size. Heights are
-synthetic and must never be interpreted as DEM. No satellite imagery, buildings,
-roads, LOS, LOD, simulation, or UAV dependencies are included.
+synthetic and must never be interpreted as DEM. Buildings, roads, LOS, LOD, simulation and UAV dependencies are excluded.
+Real DEM and satellite package import are described in [REAL_TERRAIN.md](REAL_TERRAIN.md).
 
 ## Future UAV adapter
 
@@ -131,11 +131,11 @@ separate. `uav-geo` maps to east/south local metres. `uav-map-data` and
 `uav-terrain` supply packages with bbox/origin metadata and their own stores.
 No implementations or source files were copied; that repository was not changed.
 
-The next step is an adapter replacing `demo::open_region`: convert the confirmed
+The real-package renderer now consumes validated file payloads (see REAL_TERRAIN.md).
+The next step is a source adapter replacing the file-reading task: convert the confirmed
 bbox/origin to Runtime `SetMapArea`, keep the revision as a request token, and
 install the returned terrain/map package only if its token and origin still
-match. Connect a small real DEM package first; then a licensed satellite package
-through `uav-map-data`. Keep loading errors and package ownership in that adapter,
+match. The viewer already accepts terrain v1 and map-data v2 satellite packages. Keep loading errors and package ownership in that adapter,
 with the picker and its region contract unchanged.
 
 ## Validation

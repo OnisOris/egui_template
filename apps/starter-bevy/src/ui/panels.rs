@@ -17,6 +17,7 @@ pub struct Panels<'a> {
     pub runtime: &'a mut crate::map::RegionRuntime,
     pub import: &'a mut crate::map::loading::TerrainImport,
     pub real: &'a mut crate::map::real_scene::RealScene,
+    pub satellite: &'a mut crate::map::satellite_scene::SatelliteImport,
     pub workspace: &'a mut Workspace,
     pub explorer: &'a mut ExplorerTree<ExplorerNodeId>,
     pub inspector: &'a mut InspectorState,
@@ -35,6 +36,7 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
         runtime,
         import,
         real,
+        satellite,
         workspace,
         explorer,
         inspector,
@@ -62,7 +64,12 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
             {
                 let mode = runtime.mode;
                 crate::map::controls::viewport_bar(
-                    panel_ui, viewport, runtime, active, import, real,
+                    panel_ui,
+                    viewport,
+                    runtime,
+                    active,
+                    (import, satellite),
+                    real,
                 );
                 if mode != runtime.mode && runtime.mode == crate::map::SceneMode::Editor {
                     viewport

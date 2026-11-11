@@ -11,6 +11,7 @@ directories = "=6.0.0"
 serde_json.workspace = true
 serde.workspace = true
 rfd.workspace = true
+image = { version = "=0.25.10", default-features = false, features = ["jpeg"] }
 blake3 = { version = "=1.8.7", default-features = false }
 starter-core = { path = "../../crates/starter-core" }
 starter-ui = { path = "../../crates/starter-ui" }

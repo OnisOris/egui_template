@@ -46,5 +46,7 @@ The same checks run in GitHub Actions on every push and pull request. They inclu
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/BEVY_ARCHITECTURE.md](docs/BEVY_ARCHITECTURE.md), [docs/COMPONENTS.md](docs/COMPONENTS.md), and [docs/EXTENDING.md](docs/EXTENDING.md) before extending the template.
 
-The Bevy application includes an interactive Map Picker and synthetic terrain preview.
-See [docs/MAP_PICKER.md](docs/MAP_PICKER.md) for controls, versions and limits.
+The Bevy application includes an interactive Map Picker, an explicitly synthetic Demo,
+and asynchronous import of real UAV DEM v1 / satellite map-data v2 packages.
+See [docs/MAP_PICKER.md](docs/MAP_PICKER.md) for map controls and
+[docs/REAL_TERRAIN.md](docs/REAL_TERRAIN.md) for package import, formats and limits.

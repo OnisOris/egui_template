@@ -26,6 +26,7 @@ pub(crate) struct MapUi<'w> {
     runtime: ResMut<'w, crate::map::RegionRuntime>,
     import: ResMut<'w, crate::map::loading::TerrainImport>,
     real: ResMut<'w, crate::map::real_scene::RealScene>,
+    satellite: ResMut<'w, crate::map::satellite_scene::SatelliteImport>,
 }
 
 #[derive(bevy::ecs::system::SystemParam)]
@@ -49,6 +50,7 @@ pub(crate) fn editor_ui(
         mut runtime,
         mut import,
         mut real,
+        mut satellite,
     } = map;
     let RenderUi {
         mut images,
@@ -96,6 +98,7 @@ pub(crate) fn editor_ui(
                 runtime: &mut runtime,
                 import: &mut import,
                 real: &mut real,
+                satellite: &mut satellite,
                 workspace,
                 explorer,
                 inspector,

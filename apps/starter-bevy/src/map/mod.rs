@@ -6,6 +6,8 @@ pub mod loading;
 pub mod picker;
 pub mod real_scene;
 pub mod region;
+pub mod satellite;
+pub mod satellite_scene;
 pub mod selection;
 pub mod source;
 mod terrain;
@@ -41,6 +43,7 @@ impl Plugin for MapPlugin {
             .init_resource::<demo::DemoScene>()
             .init_resource::<loading::TerrainImport>()
             .init_resource::<real_scene::RealScene>()
+            .init_resource::<satellite_scene::SatelliteImport>()
             .add_systems(Startup, loading::import_from_env)
             .add_systems(
                 Update,
@@ -48,6 +51,8 @@ impl Plugin for MapPlugin {
                     loading::poll_import,
                     real_scene::open_real,
                     demo::open_region,
+                    satellite_scene::poll_satellite,
+                    satellite_scene::update_material,
                     real_scene::grid_visibility,
                 )
                     .chain(),
@@ -60,3 +65,6 @@ mod interaction_tests;
 
 #[cfg(test)]
 mod dem_tests;
+
+#[cfg(test)]
+mod satellite_tests;
