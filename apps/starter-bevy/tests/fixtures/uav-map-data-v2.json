@@ -1,0 +1,46 @@
+{
+  "formatVersion": 2,
+  "mapDataId": "map-data-4c77a0667ffcbe5ed2c8d59f574be6f67aee7f897a5b7b2fdf55028fa7e35563",
+  "bbox": {
+    "north": 55.76,
+    "south": 55.74,
+    "east": 37.64,
+    "west": 37.61
+  },
+  "origin": {
+    "latitude": 55.75,
+    "longitude": 37.62
+  },
+  "satellite": {
+    "provider": "esri-world-imagery",
+    "zoom": 15,
+    "width": 700,
+    "height": 829,
+    "tileCount": 16,
+    "groundResolutionMPerPixel": 2.6886960110790334,
+    "georeference": {
+      "zoom": 15,
+      "tileSize": 256,
+      "cropPixelBounds": {
+        "left": 5070680.0,
+        "top": 2622126.0,
+        "right": 5071380.0,
+        "bottom": 2622955.0
+      }
+    },
+    "file": "satellite.jpg",
+    "mediaType": "image/jpeg",
+    "attribution": "Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community"
+  },
+  "vectors": {
+    "provider": "openfreemap",
+    "zoom": 14,
+    "tileCount": 6,
+    "roadCount": 2038,
+    "buildingCount": 1305,
+    "roadsFile": "roads.bin",
+    "buildingsFile": "buildings.bin",
+    "binaryFormat": "bincode-v2-serde",
+    "attribution": "<a href=\"https://openfreemap.org\" target=\"_blank\">OpenFreeMap</a> <a href=\"https://www.openmaptiles.org/\" target=\"_blank\">&copy; OpenMapTiles</a> Data from <a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\">OpenStreetMap</a>"
+  }
+}

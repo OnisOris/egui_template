@@ -72,7 +72,15 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
     workspace.show(ui, |panel_ui, pane| match pane {
         PanelId::Map => {
             map_visible = true;
-            open = crate::map::ui::show(panel_ui, picker, active, runtime, import, real, project);
+            open = crate::map::ui::show(
+                panel_ui,
+                picker,
+                active,
+                runtime,
+                (import, satellite),
+                real,
+                project,
+            );
             if open && project_io.benchmark {
                 project_io.benchmark = false;
                 commands.push(Command::NewDocument);
@@ -162,6 +170,7 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
     if !viewport_visible {
         viewport.drag = None;
     }
+    crate::map::package_browser::show(ui, satellite, active, real);
     if !map_visible {
         picker.selection.drag_start = None;
     }

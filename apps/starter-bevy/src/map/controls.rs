@@ -60,9 +60,9 @@ pub fn viewport_bar(
             ui.add_enabled_ui(scene.satellite.is_some(), |ui| {
                 ui.selectable_value(&mut scene.satellite_enabled, true, "Satellite");
             });
-            if ui.small_button("Import Satellite…").clicked() {
+            if ui.small_button("Import Existing Package…").clicked() {
                 import.builder.cancel();
-                satellite.start(active, scene, None);
+                satellite.packages.open = true;
             }
         }
         if ui

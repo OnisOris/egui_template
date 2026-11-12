@@ -25,9 +25,12 @@ pub struct SatelliteImport {
     terrain: Option<blake3::Hash>,
     pub error: Option<String>,
     env_attempted: bool,
+    pub pending: Option<SatellitePayload>,
+    pub packages: super::package_browser::PackageBrowser,
 }
 impl SatelliteImport {
     pub fn cancel(&mut self) {
+        self.pending = None;
         self.task = None;
         self.error = None;
     }
@@ -40,16 +43,15 @@ impl SatelliteImport {
         scene: &RealScene,
         directory: Option<PathBuf>,
     ) {
-        let Some(data) = scene.data.clone() else {
-            return;
-        };
-        if scene.revision != active.get().map(|(r, _)| r) {
+        let data = scene.data.clone();
+        if data.is_some() && scene.revision != active.get().map(|(r, _)| r) {
             self.error =
                 Some("Open the confirmed region's DEM before importing satellite imagery.".into());
             return;
         }
-        self.revision = scene.revision;
-        self.terrain = Some(data.fingerprint);
+        self.revision = active.get().map(|(r, _)| r);
+        self.terrain = data.as_ref().map(|d| d.fingerprint);
+        self.pending = None;
         self.error = None;
         self.task = Some(AsyncComputeTaskPool::get().spawn(async move {
             let path = directory.or_else(|| {
@@ -57,14 +59,22 @@ impl SatelliteImport {
                     .set_title("Import matching UAV map-data v2 package")
                     .pick_folder()
             });
-            path.map(|p| satellite::load_satellite(&p, &data))
-                .transpose()
+            path.map(|p| {
+                let mut payload = satellite::read_package(&p, None)?;
+                if let Some(data) = &data
+                    && payload.manifest.validate(Some(data)).is_ok()
+                {
+                    satellite::prepare_uvs(&mut payload, data)?;
+                }
+                Ok(payload)
+            })
+            .transpose()
         }));
     }
     pub fn is_current(&self, active: &ActiveMapRegion, scene: &RealScene) -> bool {
         self.revision == active.get().map(|(r, _)| r)
-            && self.revision == scene.revision
-            && self.terrain == scene.fingerprint()
+            && (self.terrain.is_none()
+                || (self.revision == scene.revision && self.terrain == scene.fingerprint()))
     }
 }
 
@@ -80,6 +90,23 @@ pub fn poll_satellite(
             import.start(&active, &scene, Some(path.into()));
         }
     }
+    if import.task.is_none()
+        && scene.revision == active.get().map(|(r, _)| r)
+        && let Some(data) = scene.data.clone()
+        && import
+            .pending
+            .as_ref()
+            .is_some_and(|p| p.manifest.validate(Some(&data)).is_ok())
+    {
+        let mut payload = import.pending.take().unwrap();
+        import.revision = scene.revision;
+        import.terrain = scene.fingerprint();
+        import.error = None;
+        import.task = Some(AsyncComputeTaskPool::get().spawn(async move {
+            satellite::prepare_uvs(&mut payload, &data)?;
+            Ok(Some(payload))
+        }));
+    }
     if !import.is_current(&active, &scene) {
         import.task = None;
         return;
@@ -91,6 +118,14 @@ pub fn poll_satellite(
         import.task = None;
         match result {
             Ok(Some(payload)) => {
+                if payload.uvs.is_empty() {
+                    import.error = scene.data.as_ref().map(|_| {
+                        "Satellite package does not match the current terrain region".into()
+                    });
+                    import.pending = Some(payload);
+                    import.packages.open = true;
+                    return;
+                }
                 if let Err(error) = install(&mut scene, &mut assets, payload) {
                     import.error = Some(error);
                 }

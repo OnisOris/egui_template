@@ -55,7 +55,7 @@ pub struct MapManifest {
     pub satellite: SatelliteMetadata,
 }
 impl MapManifest {
-    fn validate(&self, terrain: &TerrainPayload) -> Result<(), String> {
+    pub fn validate(&self, terrain: Option<&TerrainPayload>) -> Result<(), String> {
         let s = &self.satellite;
         let g = &s.georeference;
         let b = &g.crop_pixel_bounds;
@@ -71,10 +71,9 @@ impl MapManifest {
             );
         }
         let region = super::region::MapRegion::new(self.bbox, self.origin).map_err(String::from)?;
-        if !terrain.manifest.matches(region) {
+        if terrain.is_some_and(|t| !t.manifest.matches(region)) {
             return Err(
-                "Satellite bbox/origin differs from the loaded DEM. Import the matching package."
-                    .into(),
+                "Satellite package does not match the current terrain region (bbox/origin).".into(),
             );
         }
         if s.width == 0
@@ -124,6 +123,13 @@ pub fn load_satellite(
     directory: &Path,
     terrain: &TerrainPayload,
 ) -> Result<SatellitePayload, String> {
+    read_package(directory, Some(terrain))
+}
+
+pub fn read_package(
+    directory: &Path,
+    terrain: Option<&TerrainPayload>,
+) -> Result<SatellitePayload, String> {
     let json = read_limited(&directory.join("manifest.json"), 1_048_576)?;
     let manifest: MapManifest =
         serde_json::from_slice(&json).map_err(|e| format!("Invalid map-data manifest: {e}"))?;
@@ -142,6 +148,25 @@ pub fn load_satellite(
     {
         return Err("JPEG dimensions disagree with satellite manifest.".into());
     }
+    let mut payload = SatellitePayload {
+        manifest,
+        rgba: decoded.into_rgba8().into_raw(),
+        fingerprint: {
+            let mut hash = blake3::Hasher::new();
+            hash.update(&json);
+            hash.update(&jpeg);
+            hash.finalize()
+        },
+        uvs: Vec::new(),
+    };
+    if let Some(terrain) = terrain {
+        prepare_uvs(&mut payload, terrain)?;
+    }
+    Ok(payload)
+}
+
+pub fn prepare_uvs(payload: &mut SatellitePayload, terrain: &TerrainPayload) -> Result<(), String> {
+    payload.manifest.validate(Some(terrain))?;
     let m = &terrain.manifest;
     let mut uvs = Vec::new();
     for y in (0..m.height - 1).step_by(CHUNK_CELLS as usize) {
@@ -151,19 +176,12 @@ pub fn load_satellite(
                 for col in x..=x + CHUNK_CELLS.min(m.width - 1 - x) {
                     let p = terrain.position(col, row);
                     let (lon, lat) = local_to_wgs84(m.origin, p[0], p[1]);
-                    uv.push(manifest.satellite.georeference.uv(lon, lat));
+                    uv.push(payload.manifest.satellite.georeference.uv(lon, lat));
                 }
             }
             uvs.push(uv);
         }
     }
-    let mut hash = blake3::Hasher::new();
-    hash.update(&json);
-    hash.update(&jpeg);
-    Ok(SatellitePayload {
-        manifest,
-        rgba: decoded.into_rgba8().into_raw(),
-        fingerprint: hash.finalize(),
-        uvs,
-    })
+    payload.uvs = uvs;
+    Ok(())
 }

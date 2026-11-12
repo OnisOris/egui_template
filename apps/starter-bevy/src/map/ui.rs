@@ -12,15 +12,29 @@ pub fn show(
     picker: &mut MapPicker,
     active: &mut ActiveMapRegion,
     runtime: &mut RegionRuntime,
-    import: &mut super::loading::TerrainImport,
+    imports: (
+        &mut super::loading::TerrainImport,
+        &mut super::satellite_scene::SatelliteImport,
+    ),
     scene: &super::real_scene::RealScene,
     project: &mut starter_core::ProjectState,
 ) -> bool {
+    let (import, satellite) = imports;
     let mut open = false;
     egui::Panel::top("map_tools").show(ui, |ui| {
         ui.heading("Map · Region picker");
         search_bar(ui, picker);
         picker.imagery.controls(ui);
+        ui.menu_button("Satellite Packages", |ui| {
+            if ui.button("Import Existing Package…").clicked() {
+                satellite.start(active, scene, None);
+                ui.close();
+            }
+            if ui.button("Browse Existing Packages…").clicked() {
+                satellite.packages.open = true;
+                ui.close();
+            }
+        });
     });
     egui::ScrollArea::vertical()
         .id_salt("map_region_controls")

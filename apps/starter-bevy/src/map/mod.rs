@@ -9,6 +9,7 @@ pub mod imagery_view;
 pub mod loading;
 mod marker_overlay;
 pub mod objects;
+pub mod package_browser;
 pub mod picker;
 pub mod real_scene;
 pub mod region;
@@ -91,3 +92,6 @@ mod project_tests;
 
 #[cfg(test)]
 mod model_placement_tests;
+
+#[cfg(test)]
+mod package_tests;
