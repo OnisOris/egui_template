@@ -104,3 +104,39 @@ fn documented_project_fixture_is_portable_and_can_be_saved_and_opened() {
     assert!(document.map_region.is_some());
     assert!(!document.layer(LayerKind::Satellite).visible);
 }
+
+#[test]
+fn explorer_does_not_report_previous_region_terrain_as_ready() {
+    use egui_kittest::{Harness, kittest::Queryable};
+    let package = dem_tests::package(3, 3);
+    let data = Arc::new(source::load_terrain(package.path()).unwrap());
+    let mut region = data.manifest.region();
+    region.bounds.west += 1.0;
+    region.bounds.east += 1.0;
+    let mut project = Project::default();
+    project.document.map_region = Some(region);
+    let real = RealScene {
+        data: Some(data),
+        revision: Some(1),
+        ..Default::default()
+    };
+    let mut io = ProjectIo::default();
+    let mut state = crate::ui::project_explorer::ExplorerState::default();
+    let import = TerrainImport::default();
+    let mut harness = Harness::new_ui(|ui| {
+        crate::ui::project_explorer::show(ui, &mut state, &mut project, &mut io, &real, &import)
+    });
+    harness.run_ok();
+    assert!(
+        harness
+            .query_all_by_label("● Terrain · Previous region")
+            .next()
+            .is_some()
+    );
+    assert!(
+        harness
+            .query_all_by_label("● Terrain · Ready")
+            .next()
+            .is_none()
+    );
+}

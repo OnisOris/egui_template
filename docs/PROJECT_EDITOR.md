@@ -166,7 +166,7 @@ are embedded. Tests save/open this exact fixture and compare the document.
 - Full `scripts/check.sh` succeeded: line budgets, `cargo fmt --all --check`,
   `cargo clippy --workspace --all-targets -- -D warnings`, workspace tests,
   `cargo build --workspace --release`, dependency/egui-version check.
-- **96 tests passed**, including **66 starter-bevy library tests**. No public
+- **97 tests passed**, including **67 starter-bevy library tests**. No public
   cartographic or paid-service HTTP requests occur in normal CI tests.
 - A real native Bevy process launched on Linux/Hyprland with NVIDIA GeForce
   RTX 3050 6GB Laptop GPU / Vulkan (NVIDIA 615.78.08). Startup completed without

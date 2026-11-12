@@ -53,6 +53,17 @@ pub fn show(
         }
         ProjectSelection::Layer(kind) => {
             ui.strong(format!("{kind:?}"));
+            if real.data.as_ref().is_some_and(|d| {
+                project
+                    .document
+                    .map_region
+                    .is_none_or(|r| !d.manifest.matches(r))
+            }) {
+                ui.colored_label(
+                    egui::Color32::YELLOW,
+                    "Previous region data · load the current region",
+                );
+            }
             let mut visible = project.document.layer(kind).visible;
             if ui.checkbox(&mut visible, "Visible").changed() {
                 project.document.layer_mut(kind).visible = visible;

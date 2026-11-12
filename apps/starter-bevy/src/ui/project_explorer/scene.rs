@@ -15,14 +15,21 @@ pub fn build(
         if b.dir(Node::Map, "Map") {
             for kind in [LayerKind::Terrain, LayerKind::Satellite] {
                 let layer = project.document.layer(kind);
-                let ready = match kind {
+                let current = project
+                    .document
+                    .map_region
+                    .is_some_and(|r| real.data.as_ref().is_some_and(|d| d.manifest.matches(r)));
+                let present = match kind {
                     LayerKind::Terrain => real.data.is_some(),
                     LayerKind::Satellite => real.satellite.is_some(),
                 };
+                let ready = current && present;
                 let status = if ready {
                     "Ready"
                 } else if import.builder.loading || import.loading() {
                     "Loading"
+                } else if present && !current {
+                    "Previous region"
                 } else if layer.package_id.is_some() {
                     "Missing cache · Load in 3D"
                 } else {
