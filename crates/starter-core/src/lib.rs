@@ -6,3 +6,10 @@ pub use document::{
     ObjectId, Position, SceneObject, TEST_LOADS,
 };
 pub use state::{Command, DocumentState};
+
+mod geo;
+pub mod project;
+pub use geo::{EARTH_RADIUS, GeoBounds, GeoOrigin, MERCATOR_LATITUDE, MapRegion};
+pub use project::{
+    LayerKind, MapLayer, MapMarker, ProjectAsset, ProjectDocument, ProjectSelection, ProjectState,
+};

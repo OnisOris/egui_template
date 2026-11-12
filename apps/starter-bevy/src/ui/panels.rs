@@ -12,6 +12,8 @@ use crate::{
 };
 
 pub struct Panels<'a> {
+    pub project: &'a mut crate::project::Project,
+    pub project_io: &'a mut crate::project::ProjectIo,
     pub picker: &'a mut crate::map::picker::MapPicker,
     pub active: &'a mut crate::map::region::ActiveMapRegion,
     pub runtime: &'a mut crate::map::RegionRuntime,
@@ -31,6 +33,8 @@ pub struct Panels<'a> {
 
 pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
     let Panels {
+        project,
+        project_io,
         picker,
         active,
         runtime,
@@ -57,7 +61,13 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
             open = crate::map::ui::show(panel_ui, picker, active, runtime, import, real);
         }
         PanelId::Explorer => {
-            commands.extend(show_explorer(panel_ui, document, explorer));
+            if project_io.benchmark {
+                commands.extend(show_explorer(panel_ui, document, explorer));
+            } else {
+                panel_ui.heading("Explorer");
+                panel_ui.label(&project.document.name);
+                panel_ui.label("Empty project");
+            }
         }
         PanelId::Viewport => {
             viewport_visible = true;
@@ -86,10 +96,31 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
             );
         }
         PanelId::Inspector => {
-            commands.extend(show_inspector(panel_ui, document, inspector));
+            if project_io.benchmark {
+                commands.extend(show_inspector(panel_ui, document, inspector));
+            } else {
+                panel_ui.heading("Project");
+                let mut name = project.document.name.clone();
+                if panel_ui.text_edit_singleline(&mut name).changed()
+                    && !name.trim().is_empty()
+                    && name.len() <= 256
+                {
+                    project.document.name = name;
+                    project.changed();
+                }
+                panel_ui.label(if project.dirty {
+                    "Unsaved changes"
+                } else {
+                    "Saved"
+                });
+            }
         }
         PanelId::DataTable => {
-            commands.extend(show_data_table(panel_ui, document, table));
+            if project_io.benchmark {
+                commands.extend(show_data_table(panel_ui, document, table));
+            } else {
+                panel_ui.label("Map objects");
+            }
         }
         PanelId::Charts => charts(panel_ui, metrics),
         PanelId::Components => gallery::show(panel_ui, gallery),

@@ -26,6 +26,12 @@ pub struct TerrainImport {
 }
 
 impl TerrainImport {
+    pub fn cancel(&mut self) {
+        self.task = None;
+        self.prepared = None;
+        self.builder.cancel();
+        self.error = None;
+    }
     pub fn loading(&self) -> bool {
         self.task.is_some()
     }

@@ -27,6 +27,10 @@ pub struct SatelliteImport {
     env_attempted: bool,
 }
 impl SatelliteImport {
+    pub fn cancel(&mut self) {
+        self.task = None;
+        self.error = None;
+    }
     pub fn loading(&self) -> bool {
         self.task.is_some()
     }

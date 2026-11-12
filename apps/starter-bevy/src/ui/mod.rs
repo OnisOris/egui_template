@@ -3,7 +3,7 @@ use std::time::Instant;
 use bevy::camera::RenderTarget;
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, egui};
-use starter_core::{Command, GroupId};
+use starter_core::Command;
 
 use crate::state::DocumentResource;
 use starter_ui::Theme;
@@ -43,6 +43,8 @@ pub(crate) fn editor_ui(
     mut viewport: ResMut<ViewportState>,
     mut metrics: ResMut<EditorMetrics>,
     targets: RenderUi,
+    mut project: ResMut<crate::project::Project>,
+    mut project_io: ResMut<crate::project::ProjectIo>,
 ) -> Result {
     let MapUi {
         mut picker,
@@ -57,6 +59,7 @@ pub(crate) fn editor_ui(
         mut cameras,
     } = targets;
     let started = Instant::now();
+    crate::project::ui::unsaved(contexts.ctx_mut()?, &mut project_io, &mut project);
     let projection = viewport.camera.projection;
     let actions;
     let commands;
@@ -93,6 +96,8 @@ pub(crate) fn editor_ui(
         commands = panels::show(
             &mut root,
             panels::Panels {
+                project: &mut project,
+                project_io: &mut project_io,
                 picker: &mut picker,
                 active: &mut active,
                 runtime: &mut runtime,
@@ -128,6 +133,8 @@ pub(crate) fn editor_ui(
             &mut document,
             &mut viewport,
             &mut runtime,
+            &mut project,
+            &mut project_io,
         );
     }
     metrics.ui_ms = started.elapsed().as_secs_f32() * 1000.0;
@@ -140,6 +147,8 @@ fn apply(
     document: &mut DocumentResource,
     viewport: &mut ViewportState,
     runtime: &mut crate::map::RegionRuntime,
+    project: &mut crate::project::Project,
+    io: &mut crate::project::ProjectIo,
 ) {
     if runtime.mode != crate::map::SceneMode::Editor
         && matches!(
@@ -150,26 +159,47 @@ fn apply(
         crate::viewport::focus_geo(viewport);
         return;
     }
-    if matches!(
-        action,
-        EditorAction::New | EditorAction::SetLoad(_) | EditorAction::AddObject
-    ) {
+    if matches!(action, EditorAction::SetLoad(_)) {
         runtime.mode = crate::map::SceneMode::Editor;
     }
     match action {
-        EditorAction::New => {
+        EditorAction::New
+        | EditorAction::Open
+        | EditorAction::Save
+        | EditorAction::SaveAs
+        | EditorAction::ImportAsset
+        | EditorAction::Exit => {
+            use crate::project::ProjectAction as A;
+            let action = match action {
+                EditorAction::New => A::New,
+                EditorAction::Open => A::Open,
+                EditorAction::Save => A::Save,
+                EditorAction::SaveAs => A::SaveAs,
+                EditorAction::ImportAsset => A::Import,
+                _ => A::Exit,
+            };
+            io.request(action, project);
+        }
+        EditorAction::ExitDemo => {
+            io.benchmark = false;
             dispatch(document, &mut ui_state.notice, Command::NewDocument);
-            viewport.camera.reset(bounds(document));
+            runtime.mode = if project.document.map_region.is_some() {
+                crate::map::SceneMode::Real
+            } else {
+                crate::map::SceneMode::Editor
+            };
+            crate::viewport::focus_geo(viewport);
         }
         EditorAction::AddObject => {
-            dispatch(
-                document,
-                &mut ui_state.notice,
-                Command::AddObject(GroupId::A),
-            );
+            project.placing_marker = true;
+            ui_state.workspace.activate(starter_ui::PanelId::Map);
         }
         EditorAction::DeleteSelection => {
-            dispatch(document, &mut ui_state.notice, Command::DeleteSelection);
+            if io.benchmark {
+                dispatch(document, &mut ui_state.notice, Command::DeleteSelection);
+            } else {
+                project.delete_selected();
+            }
         }
         EditorAction::FocusSelection => {
             if let Some(object) = document.selected_object() {
@@ -189,6 +219,7 @@ fn apply(
             };
         }
         EditorAction::SetLoad(size) => {
+            io.benchmark = true;
             dispatch(document, &mut ui_state.notice, Command::LoadTestScene(size));
             viewport.camera.reset(bounds(document));
         }

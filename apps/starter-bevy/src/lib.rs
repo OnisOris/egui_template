@@ -6,6 +6,7 @@ use starter_core::{Command, TEST_LOADS};
 mod layout;
 pub mod map;
 pub mod metrics;
+pub mod project;
 pub mod scene;
 pub mod state;
 pub mod ui;
@@ -23,6 +24,7 @@ pub fn run() -> AppExit {
 pub fn build() -> App {
     let mut app = App::new();
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
+        close_when_requested: false,
         primary_window: Some(Window {
             title: "Bevy + egui Starter".into(),
             resolution: (1440, 900).into(),
@@ -39,7 +41,7 @@ pub fn build() -> App {
     app.world_mut()
         .resource_mut::<EguiGlobalSettings>()
         .auto_create_primary_context = false;
-    let mut document = DocumentResource::default();
+    let mut document = DocumentResource::empty();
     if let Ok(value) = std::env::var("STARTER_LOAD")
         && let Ok(count) = value.parse::<usize>()
         && TEST_LOADS.contains(&count)
@@ -49,7 +51,12 @@ pub fn build() -> App {
     app.insert_resource(document)
         .init_resource::<EditorMetrics>()
         .init_resource::<UiState>()
-        .add_plugins((ScenePlugin, ViewportPlugin, map::MapPlugin))
+        .add_plugins((
+            ScenePlugin,
+            ViewportPlugin,
+            map::MapPlugin,
+            project::ProjectPlugin,
+        ))
         .add_systems(
             Update,
             (

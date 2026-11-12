@@ -29,14 +29,37 @@ fn menu(
     egui::Panel::top("bevy_menu_bar").show(ui, |ui| {
         egui::MenuBar::new().ui(ui, |ui| {
             ui.menu_button("File", |ui| {
-                if ui.button("New document").clicked() {
-                    actions.push(EditorAction::New);
-                    ui.close();
+                for (label, action) in [
+                    ("New Project", EditorAction::New),
+                    ("Open Project…", EditorAction::Open),
+                    ("Save", EditorAction::Save),
+                    ("Save As…", EditorAction::SaveAs),
+                    ("Import Asset…", EditorAction::ImportAsset),
+                    ("Exit", EditorAction::Exit),
+                ] {
+                    if ui.button(label).clicked() {
+                        actions.push(action);
+                        ui.close();
+                    }
                 }
+            });
+            ui.menu_button("Tools", |ui| {
+                ui.menu_button("Demo / Benchmark", |ui| {
+                    for count in TEST_LOADS {
+                        if ui.button(format!("{count} demo objects")).clicked() {
+                            actions.push(EditorAction::SetLoad(count));
+                            ui.close();
+                        }
+                    }
+                    if ui.button("Return to Project").clicked() {
+                        actions.push(EditorAction::ExitDemo);
+                        ui.close();
+                    }
+                });
             });
             ui.menu_button("Edit", |ui| {
                 for (label, action) in [
-                    ("Add object", EditorAction::AddObject),
+                    ("Add Object → Marker", EditorAction::AddObject),
                     ("Delete selection", EditorAction::DeleteSelection),
                 ] {
                     if ui.button(label).clicked() {
@@ -90,7 +113,7 @@ fn toolbar(ui: &mut Ui, objects: usize, projection: ProjectionMode) -> Vec<Edito
             if ui.button("New").clicked() {
                 actions.push(EditorAction::New);
             }
-            if ui.button("+ Object").clicked() {
+            if ui.button("+ Marker").clicked() {
                 actions.push(EditorAction::AddObject);
             }
             if ui.button("Delete").clicked() {
@@ -110,18 +133,7 @@ fn toolbar(ui: &mut Ui, objects: usize, projection: ProjectionMode) -> Vec<Edito
                 actions.push(EditorAction::ToggleProjection);
             }
             ui.separator();
-            egui::ComboBox::from_id_salt("bevy_scene_load")
-                .selected_text(format!("{objects} objects"))
-                .show_ui(ui, |ui| {
-                    for size in TEST_LOADS {
-                        if ui
-                            .selectable_label(objects == size, size.to_string())
-                            .clicked()
-                        {
-                            actions.push(EditorAction::SetLoad(size));
-                        }
-                    }
-                });
+            ui.label(format!("{objects} benchmark objects"));
         });
     });
     actions

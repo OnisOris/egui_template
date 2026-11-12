@@ -36,7 +36,15 @@ pub struct DocumentState {
 
 impl Default for DocumentState {
     fn default() -> Self {
-        let document = Document::demo(TEST_LOADS[0]).expect("built-in load is valid");
+        Self::from_document(Document::demo(TEST_LOADS[0]).expect("built-in load is valid"))
+    }
+}
+
+impl DocumentState {
+    pub fn empty() -> Self {
+        Self::from_document(Document::empty())
+    }
+    fn from_document(document: Document) -> Self {
         let object_indices = index_objects(&document);
         Self {
             document,

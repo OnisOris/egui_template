@@ -9,6 +9,12 @@ use crate::ui::gallery::GalleryState;
 #[derive(Resource, Default)]
 pub struct DocumentResource(pub DocumentState);
 
+impl DocumentResource {
+    pub fn empty() -> Self {
+        Self(DocumentState::empty())
+    }
+}
+
 impl Deref for DocumentResource {
     type Target = DocumentState;
 
@@ -60,6 +66,12 @@ impl Default for UiState {
 #[derive(Clone, Copy, Debug)]
 pub enum EditorAction {
     New,
+    Open,
+    Save,
+    SaveAs,
+    ImportAsset,
+    Exit,
+    ExitDemo,
     AddObject,
     DeleteSelection,
     FocusSelection,
@@ -68,4 +80,21 @@ pub enum EditorAction {
     ToggleProjection,
     ToggleTheme,
     SetLoad(usize),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn normal_workspace_is_empty_and_legacy_desktop_default_is_unchanged() {
+        assert!(DocumentResource::empty().document().objects().is_empty());
+        assert_eq!(DocumentState::default().document().objects().len(), 100);
+        let mut benchmark = DocumentResource::empty();
+        let project = starter_core::ProjectState::default();
+        benchmark
+            .dispatch(starter_core::Command::LoadTestScene(10_000))
+            .unwrap();
+        assert_eq!(benchmark.document().objects().len(), 10_000);
+        assert!(project.document.objects.is_empty());
+    }
 }
