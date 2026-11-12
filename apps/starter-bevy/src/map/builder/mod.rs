@@ -4,15 +4,16 @@ pub mod coverage;
 pub mod dem;
 pub mod download;
 pub mod provider;
+pub mod runtime;
 
 use serde::Serialize;
 use std::sync::{
-    Arc,
+    Arc, Mutex,
     atomic::{AtomicBool, Ordering},
-    mpsc,
 };
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, serde::Deserialize)]
+#[serde(default)]
 pub struct Config {
     pub step_m: f64,
     pub max_edge: u32,
@@ -50,7 +51,7 @@ impl Config {
 #[derive(Clone)]
 pub struct Job {
     pub cancelled: Arc<AtomicBool>,
-    pub progress: mpsc::Sender<String>,
+    pub progress: Arc<Mutex<String>>,
 }
 impl Job {
     pub fn check(&self) -> Result<(), String> {
@@ -61,7 +62,7 @@ impl Job {
         }
     }
     pub fn status(&self, message: String) {
-        let _ = self.progress.send(message);
+        *self.progress.lock().unwrap() = message;
     }
 }
 

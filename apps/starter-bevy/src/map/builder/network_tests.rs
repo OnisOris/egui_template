@@ -67,7 +67,7 @@ impl Drop for Server {
     }
 }
 fn job() -> Job {
-    let (progress, _) = mpsc::channel();
+    let progress = Arc::new(Mutex::new(String::new()));
     Job {
         cancelled: Arc::new(AtomicBool::new(false)),
         progress,

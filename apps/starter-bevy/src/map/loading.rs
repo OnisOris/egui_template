@@ -18,6 +18,7 @@ pub struct PreparedTerrain {
 
 #[derive(Resource, Default)]
 pub struct TerrainImport {
+    pub builder: super::builder::runtime::MapPackageBuilder,
     task: Option<Task<Result<Option<PreparedTerrain>, String>>>,
     requested_revision: Option<u64>,
     pub prepared: Option<PreparedTerrain>,
@@ -35,6 +36,7 @@ impl TerrainImport {
         directory: Option<PathBuf>,
         cached: Option<blake3::Hash>,
     ) {
+        self.builder.cancel();
         self.requested_revision = active.get().map(|(r, _)| r);
         self.error = None;
         self.task = Some(AsyncComputeTaskPool::get().spawn(async move {
@@ -56,6 +58,13 @@ impl TerrainImport {
             let grid = (!reuse).then(|| dem_mesh::grid(&data));
             Ok(Some(PreparedTerrain { data, meshes, grid }))
         }));
+    }
+
+    pub fn start_automatic(&mut self, active: &ActiveMapRegion) {
+        self.task = None;
+        self.prepared = None;
+        self.error = None;
+        self.builder.start(active);
     }
 
     pub fn is_current(&self, active: &ActiveMapRegion) -> bool {

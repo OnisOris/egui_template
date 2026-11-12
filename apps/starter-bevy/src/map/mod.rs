@@ -50,6 +50,7 @@ impl Plugin for MapPlugin {
                 Update,
                 (
                     loading::poll_import,
+                    builder::runtime::poll_builder,
                     real_scene::open_real,
                     demo::open_region,
                     satellite_scene::poll_satellite,

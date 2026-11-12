@@ -147,32 +147,41 @@ fn region_details(
         if ui
             .add_enabled(
                 active.get().is_some() && preview.is_none() && !import.loading(),
-                egui::Button::new("Open in 3D")
+                egui::Button::new("Load in 3D")
                     .min_size(egui::vec2(140.0, 30.0))
                     .fill(ui.visuals().selection.bg_fill),
             )
             .clicked()
         {
-            runtime.real_requested = true;
+            import.start_automatic(active);
             return_open = true;
         }
-        if ui.button("Import DEM…").clicked() {
-            import.start(active, None, scene.fingerprint());
-        }
-        if ui
-            .add_enabled(active.get().is_some(), egui::Button::new("Demo"))
-            .clicked()
-            && let Some((_, region)) = active.get()
-        {
-            match super::demo::validate_demo(region) {
-                Ok(()) => {
-                    runtime.open_requested = true;
-                    return_open = true;
-                }
-                Err(error) => picker.selection.error = Some(error.into()),
+        ui.menu_button("More…", |ui| {
+            if ui.button("Import DEM…").clicked() {
+                import.start(active, None, scene.fingerprint());
             }
-        }
+            if ui
+                .add_enabled(active.get().is_some(), egui::Button::new("Demo"))
+                .clicked()
+                && let Some((_, region)) = active.get()
+            {
+                match super::demo::validate_demo(region) {
+                    Ok(()) => {
+                        runtime.open_requested = true;
+                        return_open = true;
+                    }
+                    Err(error) => picker.selection.error = Some(error.into()),
+                }
+            }
+        });
     });
+    let status = import.builder.status();
+    if !status.is_empty() {
+        ui.label(status);
+    }
+    if import.builder.loading && ui.button("Cancel load").clicked() {
+        import.builder.cancel();
+    }
     if let Some(package) = &import.prepared {
         let m = &package.data.manifest;
         if active.get().is_none_or(|(_, r)| !m.matches(r)) {
@@ -187,7 +196,7 @@ fn region_details(
     }
     super::controls::status(ui, active, import, scene);
     if let Some((revision, _)) = active.get() {
-        ui.small(format!("Confirmed revision {revision} · Open in 3D uses this region. Demo is explicitly synthetic."));
+        ui.small(format!("Confirmed revision {revision} · Load in 3D uses this region. Demo is explicitly synthetic."));
     }
     if let Some(error) = &picker.selection.error {
         ui.colored_label(ui.visuals().error_fg_color, error);

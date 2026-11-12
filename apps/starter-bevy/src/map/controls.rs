@@ -6,7 +6,10 @@ use crate::viewport::{ViewportState, focus_geo};
 use bevy_egui::egui::{self, Ui};
 
 pub fn status(ui: &mut Ui, active: &ActiveMapRegion, import: &TerrainImport, scene: &RealScene) {
-    if import.loading() {
+    if import.builder.loading {
+        ui.spinner();
+        ui.label(import.builder.status());
+    } else if import.loading() {
         ui.spinner();
         ui.label("Loading DEM package… UI remains available.");
     } else if active.get().is_none() {
@@ -16,7 +19,7 @@ pub fn status(ui: &mut Ui, active: &ActiveMapRegion, import: &TerrainImport, sce
     } else if import.prepared.is_some() {
         ui.label("Package ready · Open in 3D after confirming its region.");
     } else {
-        ui.label("No terrain package for this region · Import DEM.");
+        ui.label("No terrain package for this region · Load in 3D.");
     }
     if let Some(error) = &import.error {
         ui.colored_label(ui.visuals().error_fg_color, format!("Error · {error}"));
@@ -114,7 +117,11 @@ pub fn viewport_bar(
     {
         ui.small(&loaded.manifest.satellite.attribution);
     }
-    if import.loading() || import.error.is_some() || runtime.mode == SceneMode::Editor {
+    if import.builder.loading
+        || import.loading()
+        || import.error.is_some()
+        || runtime.mode == SceneMode::Editor
+    {
         status(ui, active, import, scene);
     }
 }
