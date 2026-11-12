@@ -66,7 +66,10 @@ impl TableState {
 pub fn show(ui: &mut Ui, project: &mut ProjectState, state: &mut TableState) {
     ui.horizontal_wrapped(|ui| {
         ui.label("Filter");
-        ui.text_edit_singleline(&mut state.filter);
+        ui.add(
+            egui::TextEdit::singleline(&mut state.filter)
+                .desired_width(ui.available_width().min(240.0)),
+        );
         egui::ComboBox::from_id_salt("marker_sort")
             .selected_text(format!("{:?}", state.sort))
             .show_ui(ui, |ui| {
@@ -92,9 +95,9 @@ pub fn show(ui: &mut Ui, project: &mut ProjectState, state: &mut TableState) {
         ui,
         "map_objects",
         state.rows.len() as u64,
-        [72.0, 160.0, 80.0, 115.0, 115.0, 100.0, 70.0]
+        [72.0, 160.0, 80.0, 115.0, 115.0, 110.0, 70.0]
             .into_iter()
-            .map(Column::new)
+            .map(|width| Column::new(width).range(width..=f32::INFINITY))
             .collect(),
         &mut delegate,
     );
@@ -150,6 +153,35 @@ impl TableDelegate for Markers<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn narrow_table_keeps_column_widths_and_scrolls_horizontally() {
+        use egui_kittest::{Harness, kittest::Queryable};
+        let mut harness = Harness::builder()
+            .with_size(egui::vec2(320.0, 300.0))
+            .with_max_steps(100)
+            .build_ui_state(
+                |ui, (project, table): &mut (ProjectState, TableState)| show(ui, project, table),
+                (ProjectState::default(), TableState::default()),
+            );
+        harness.run();
+        let id = harness.query_all_by_label("ID").next().unwrap().rect();
+        let name = harness.query_all_by_label("Name").next().unwrap().rect();
+        assert!(name.left() - id.left() >= 72.0);
+        harness.hover_at(egui::pos2(200.0, 200.0));
+        harness.run();
+        harness.event(egui::Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Point,
+            delta: egui::vec2(-2000.0, 0.0),
+            phase: egui::TouchPhase::Move,
+            modifiers: egui::Modifiers::NONE,
+        });
+        harness.run();
+        assert!(harness.query_all_by_label("Longitude").any(|n| {
+            let r = n.rect();
+            r.left() >= 72.0 && r.right() <= 320.0
+        }));
+        assert_eq!(harness.query_all_by_label("ID").next().unwrap().rect(), id);
+    }
     #[test]
     fn sorting_and_filtering_reference_the_original_marker_ids() {
         let mut p = ProjectState::default();

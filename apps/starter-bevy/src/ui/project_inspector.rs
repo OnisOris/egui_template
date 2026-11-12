@@ -1,24 +1,62 @@
 use crate::{
-    map::{loading::TerrainImport, real_scene::RealScene},
+    map::real_scene::RealScene,
     project::{Project, ProjectIo},
 };
 use bevy_egui::egui::{self, Ui};
 use starter_core::{LayerKind, ProjectSelection};
+
+#[derive(Default)]
+pub struct InspectorState {
+    selection: Option<ProjectSelection>,
+    source_name: String,
+    name_draft: String,
+    error: Option<String>,
+}
+impl InspectorState {
+    pub(super) fn name(
+        &mut self,
+        ui: &mut Ui,
+        selection: &ProjectSelection,
+        name: &str,
+    ) -> Option<String> {
+        if self.selection.as_ref() != Some(selection) || self.source_name != name {
+            self.selection = Some(selection.clone());
+            self.source_name = name.to_owned();
+            self.name_draft = name.to_owned();
+            self.error = None;
+        }
+        let response = ui.text_edit_singleline(&mut self.name_draft);
+        let commit = response.lost_focus()
+            || (response.has_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)));
+        if commit {
+            let name = self.name_draft.trim();
+            if name.is_empty() || name.len() > starter_core::MAX_NAME_LENGTH {
+                self.error = Some("Name must contain 1–256 characters.".into());
+            } else {
+                self.error = None;
+                return Some(name.to_owned());
+            }
+        }
+        if let Some(error) = &self.error {
+            ui.colored_label(ui.visuals().error_fg_color, error);
+        }
+        None
+    }
+}
+
 pub fn show(
     ui: &mut Ui,
     project: &mut Project,
     io: &ProjectIo,
     real: &mut RealScene,
-    import: &TerrainImport,
+    inspector: &mut InspectorState,
 ) {
     ui.heading("Inspector");
     match project.selection.clone() {
         ProjectSelection::Project => {
             ui.strong("Project");
-            let mut name = project.document.name.clone();
-            if ui.text_edit_singleline(&mut name).changed()
-                && !name.trim().is_empty()
-                && name.len() <= 256
+            if let Some(name) = inspector.name(ui, &project.selection, &project.document.name)
+                && name != project.document.name
             {
                 project.document.name = name;
                 project.changed();
@@ -36,6 +74,7 @@ pub fn show(
             });
         }
         ProjectSelection::Manifest => {
+            inspector.selection = None;
             ui.strong("Project JSON");
             ui.label(
                 io.path
@@ -52,6 +91,7 @@ pub fn show(
             );
         }
         ProjectSelection::Layer(kind) => {
+            inspector.selection = None;
             ui.strong(format!("{kind:?}"));
             if real.data.as_ref().is_some_and(|d| {
                 project
@@ -103,7 +143,6 @@ pub fn show(
                         ui.label(&m.attribution);
                     } else {
                         ui.label("Satellite not loaded");
-                        ui.label(import.builder.status());
                     }
                 }
             }
@@ -113,7 +152,9 @@ pub fn show(
                 let mut marker = marker.clone();
                 let before = marker.clone();
                 ui.strong(format!("Map Marker · {}", id.0));
-                ui.text_edit_singleline(&mut marker.name);
+                if let Some(name) = inspector.name(ui, &project.selection, &marker.name) {
+                    marker.name = name;
+                }
                 for (label, value) in [
                     ("Latitude", &mut marker.latitude),
                     ("Longitude", &mut marker.longitude),
@@ -157,6 +198,7 @@ pub fn show(
             }
         }
         ProjectSelection::Asset(i) => {
+            inspector.selection = None;
             if let Some(asset) = project.document.assets.get(i) {
                 ui.strong("Project resource");
                 ui.label(&asset.path);

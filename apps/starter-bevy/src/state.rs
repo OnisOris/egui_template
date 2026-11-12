@@ -45,6 +45,7 @@ pub struct UiState {
     pub gallery: GalleryState,
     pub notice: Option<String>,
     pub project_explorer: crate::ui::project_explorer::ExplorerState,
+    pub project_inspector: crate::ui::project_inspector::InspectorState,
     pub marker_table: crate::ui::project_table::TableState,
 }
 
@@ -68,6 +69,7 @@ impl Default for UiState {
             gallery: GalleryState::default(),
             notice: None,
             project_explorer: Default::default(),
+            project_inspector: Default::default(),
             marker_table: Default::default(),
         }
     }

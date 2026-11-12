@@ -58,6 +58,7 @@ fn explorer_and_virtual_table_select_the_same_document_markers() {
     );
     harness.run();
     assert!(harness.query_all_by_label("Group A").next().is_none());
+    assert!(harness.query_all_by_label("Groups").next().is_none());
     harness
         .query_all_by_label("Marker 1")
         .next()

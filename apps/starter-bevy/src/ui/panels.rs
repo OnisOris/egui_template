@@ -14,6 +14,7 @@ use crate::{
 pub struct Panels<'a> {
     pub project: &'a mut crate::project::Project,
     pub project_explorer: &'a mut super::project_explorer::ExplorerState,
+    pub project_inspector: &'a mut super::project_inspector::InspectorState,
     pub marker_table: &'a mut super::project_table::TableState,
     pub project_io: &'a mut crate::project::ProjectIo,
     pub picker: &'a mut crate::map::picker::MapPicker,
@@ -39,6 +40,7 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
         project_io,
         project_explorer,
         marker_table,
+        project_inspector,
         picker,
         active,
         runtime,
@@ -136,7 +138,13 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
             if project_io.benchmark {
                 commands.extend(show_inspector(panel_ui, document, inspector));
             } else {
-                super::project_inspector::show(panel_ui, project, project_io, real, import);
+                super::project_inspector::show(
+                    panel_ui,
+                    project,
+                    project_io,
+                    real,
+                    project_inspector,
+                );
             }
         }
         PanelId::DataTable => {

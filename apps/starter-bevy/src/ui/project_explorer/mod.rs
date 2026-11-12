@@ -9,7 +9,6 @@ pub enum Node {
     Project,
     Map,
     Objects,
-    Groups,
     Layer(LayerKind),
     Marker(ObjectId),
     Assets,
@@ -80,7 +79,7 @@ pub fn show(
     } else {
         let mut rows = 1;
         if state.tree.is_open(&Node::Project) {
-            rows += 3;
+            rows += 2;
             if state.tree.is_open(&Node::Map) {
                 rows += 2;
             }

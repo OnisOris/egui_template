@@ -90,6 +90,7 @@ pub(crate) fn editor_ui(
             notice,
             project_explorer,
             marker_table,
+            project_inspector,
         } = &mut *ui_state;
         if ctx.global_style().visuals.dark_mode != matches!(theme, Theme::Dark) {
             theme.apply(ctx);
@@ -116,6 +117,7 @@ pub(crate) fn editor_ui(
                 project_io: &mut project_io,
                 project_explorer,
                 marker_table,
+                project_inspector,
                 picker: &mut picker,
                 active: &mut active,
                 runtime: &mut runtime,
@@ -269,3 +271,6 @@ mod action_tests;
 
 #[cfg(test)]
 mod project_ui_tests;
+
+#[cfg(test)]
+mod project_inspector_tests;

@@ -6,9 +6,12 @@ use crate::viewport::{ViewportState, focus_geo};
 use bevy_egui::egui::{self, Ui};
 
 pub fn status(ui: &mut Ui, active: &ActiveMapRegion, import: &TerrainImport, scene: &RealScene) {
-    if import.builder.loading {
-        ui.spinner();
-        ui.label(import.builder.status());
+    let builder_status = import.builder.status();
+    if !builder_status.is_empty() {
+        if import.builder.loading {
+            ui.spinner();
+        }
+        ui.label(builder_status);
     } else if import.loading() {
         ui.spinner();
         ui.label("Loading DEM package… UI remains available.");
@@ -105,10 +108,6 @@ pub fn viewport_bar(
             );
         }
     }
-    let builder_status = import.builder.status();
-    if !builder_status.is_empty() {
-        ui.label(builder_status);
-    }
     if satellite.loading() {
         ui.label("Loading satellite JPEG… UI remains available.");
     }
@@ -124,7 +123,7 @@ pub fn viewport_bar(
     {
         ui.small(&loaded.manifest.satellite.attribution);
     }
-    if import.builder.loading
+    if !import.builder.status().is_empty()
         || import.loading()
         || import.error.is_some()
         || runtime.mode == SceneMode::Editor

@@ -58,8 +58,6 @@ pub fn build(
             }
         }
         b.close_dir();
-        b.dir(Node::Groups, "Groups");
-        b.close_dir();
     }
     b.close_dir();
 }

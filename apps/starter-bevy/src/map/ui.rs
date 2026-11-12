@@ -192,10 +192,6 @@ fn region_details(
             }
         });
     });
-    let status = import.builder.status();
-    if !status.is_empty() {
-        ui.label(status);
-    }
     if import.builder.loading && ui.button("Cancel load").clicked() {
         import.builder.cancel();
     }
