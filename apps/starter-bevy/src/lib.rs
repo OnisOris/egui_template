@@ -6,6 +6,7 @@ use starter_core::{Command, TEST_LOADS};
 mod layout;
 pub mod map;
 pub mod metrics;
+pub mod models;
 pub mod project;
 pub mod scene;
 pub mod state;
@@ -23,6 +24,7 @@ pub fn run() -> AppExit {
 
 pub fn build() -> App {
     let mut app = App::new();
+    models::register_source(&mut app);
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
         close_when_requested: false,
         primary_window: Some(Window {
@@ -52,6 +54,7 @@ pub fn build() -> App {
         .init_resource::<EditorMetrics>()
         .init_resource::<UiState>()
         .add_plugins((
+            models::ModelsPlugin,
             ScenePlugin,
             ViewportPlugin,
             map::MapPlugin,

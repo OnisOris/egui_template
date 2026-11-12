@@ -27,6 +27,7 @@ enum Completed {
 #[derive(Resource, Default)]
 pub struct ProjectIo {
     pub path: Option<PathBuf>,
+    pub generation: u64,
     pub file_size: Option<u64>,
     pub error: Option<String>,
     pub missing: Vec<bool>,
@@ -74,6 +75,7 @@ impl ProjectIo {
                 revision: project.revision.wrapping_add(1),
                 ..Default::default()
             };
+            self.generation = self.generation.wrapping_add(1);
             self.path = None;
             self.file_size = None;
             self.missing.clear();
@@ -137,7 +139,10 @@ impl ProjectIo {
                 }
                 ProjectAction::Import => {
                     let path = old.ok_or("Save the project before importing assets")?;
-                    let Some(source) = rfd::FileDialog::new().set_title("Import Asset").pick_file()
+                    let Some(source) = rfd::FileDialog::new()
+                        .add_filter("GLB model / image", &["glb", "png", "jpg", "jpeg", "webp"])
+                        .set_title("Import Asset")
+                        .pick_file()
                     else {
                         return Ok(Completed::Cancelled);
                     };
@@ -164,6 +169,7 @@ pub fn poll(
         io.task = None;
         match result {
             Ok(Completed::Opened(path, document, missing, size)) => {
+                io.generation = io.generation.wrapping_add(1);
                 io.file_size = Some(size);
                 project.0 = ProjectState {
                     document,
@@ -195,7 +201,10 @@ pub fn poll(
                 project.changed();
                 io.missing.push(false);
             }
-            Ok(Completed::Refreshed(missing)) => io.missing = missing,
+            Ok(Completed::Refreshed(missing)) => {
+                io.generation = io.generation.wrapping_add(1);
+                io.missing = missing;
+            }
             Ok(Completed::Cancelled) => {
                 io.continuation = None;
             }

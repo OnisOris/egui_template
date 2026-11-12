@@ -9,6 +9,7 @@ bevy_egui.workspace = true
 walkers = "=0.62.0"
 directories = "=6.0.0"
 serde_json.workspace = true
+gltf = { version = "=1.4.1", default-features = false }
 serde.workspace = true
 rfd.workspace = true
 image = { version = "=0.25.10", default-features = false, features = ["jpeg", "webp", "png"] }

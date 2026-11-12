@@ -87,6 +87,9 @@ pub fn import_asset(root: &Path, source: &Path) -> Result<starter_core::ProjectA
     } else {
         "Assets/Models"
     };
+    let model_bytes = (!texture)
+        .then(|| crate::models::files::read(source, crate::models::files::max_bytes()))
+        .transpose()?;
     controlled_directory(root, directory)?;
     let relative = format!("{directory}/{file}");
     let target = root.join(&relative);
@@ -94,12 +97,21 @@ pub fn import_asset(root: &Path, source: &Path) -> Result<starter_core::ProjectA
         return Err("An asset with that name already exists".into());
     }
     let stage = crate::map::builder::cache::Staging::new(&root.join(directory))?;
-    fs::copy(source, stage.path.join("asset")).map_err(|e| e.to_string())?;
+    if let Some(bytes) = model_bytes {
+        fs::write(stage.path.join("asset"), bytes).map_err(|e| e.to_string())?;
+    } else {
+        fs::copy(source, stage.path.join("asset")).map_err(|e| e.to_string())?;
+    }
     fs::hard_link(stage.path.join("asset"), &target).map_err(|e| e.to_string())?;
     let size = target.metadata().map_err(|e| e.to_string())?.len();
     Ok(starter_core::ProjectAsset {
         path: relative,
-        media_type: if texture { "Texture" } else { "Model / file" }.into(),
+        media_type: if texture {
+            "Texture"
+        } else {
+            "model/gltf-binary"
+        }
+        .into(),
         size,
     })
 }
