@@ -237,4 +237,12 @@ fn lower_zoom_cache_works_offline_and_origin_failure_is_explicit() {
     let mean =
         data.samples_msl.iter().map(|h| f64::from(*h)).sum::<f64>() / data.samples_msl.len() as f64;
     assert!((f64::from(data.manifest.reference_elevation_msl) - mean).abs() < 0.001);
+    let hits = server.hits.load(Ordering::Relaxed);
+    let limited = Config {
+        max_tiles: 1,
+        ..config
+    };
+    let data = dem::build(region, &limited, root.path(), &http, &job).unwrap();
+    assert_eq!(data.manifest.reference_elevation_source, "fallback-mean");
+    assert_eq!(server.hits.load(Ordering::Relaxed), hits);
 }

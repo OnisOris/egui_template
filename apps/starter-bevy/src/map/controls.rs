@@ -56,6 +56,7 @@ pub fn viewport_bar(
                 ui.selectable_value(&mut scene.satellite_enabled, true, "Satellite");
             });
             if ui.small_button("Import Satellite…").clicked() {
+                import.builder.cancel();
                 satellite.start(active, scene, None);
             }
         }

@@ -29,7 +29,7 @@ selected independent origin. Grid dimensions obey the configured sample/edge
 limits; source resolution limits the actual grid spacing. Heights are decoded as
 `256*R + G + B/256 - 32768` and interpolated in f64, stored as f32 MSL.
 Origin elevation is sampled from source tiles, fetching extra tiles if needed.
-If unavailable, the manifest records `fallback-mean`; this is never silently
+If unavailable or outside the total tile budget, the manifest records `fallback-mean`; this is never silently
 reported as an origin measurement.
 
 ## Packages and cache
@@ -58,7 +58,7 @@ reqwest client (and its internal HTTP runtime); scoped tile workers obey the
 parallelism limit. No network `block_on()` occurs in Bevy Update. Result queue is
 bounded to two events. The Bevy bridge prepares CPU meshes off-thread, checks the
 request identity, hands terrain to the existing scene, then installs satellite
-only against the same terrain fingerprint. A newer region or manual DEM import
+only against the same terrain fingerprint. A newer region, manual import or Demo action
 cancels the builder. In-flight blocking HTTP may take up to its 25s timeout to
 finish; cancellation immediately prevents scene installation, stops further
 requests and interrupts retry backoff. No runtime is created per request.

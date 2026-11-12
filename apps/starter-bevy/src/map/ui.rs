@@ -175,6 +175,7 @@ fn region_details(
             {
                 match super::demo::validate_demo(region) {
                     Ok(()) => {
+                        import.builder.cancel();
                         runtime.open_requested = true;
                         return_open = true;
                     }

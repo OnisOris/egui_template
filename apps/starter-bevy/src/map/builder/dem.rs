@@ -236,6 +236,10 @@ pub fn build(
                 bottom: origin[1],
             };
             let needed = coverage::tiles(&ob, z, 512, true, 4)?;
+            let extra = needed.iter().filter(|t| !tiles.contains_key(t)).count();
+            if tiles.len() + extra > config.max_tiles {
+                return Err("Origin elevation exceeds tile budget".into());
+            }
             let raw = http.tiles(
                 &provider.tiles[0],
                 None,
