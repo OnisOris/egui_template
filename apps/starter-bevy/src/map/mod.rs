@@ -1,3 +1,4 @@
+pub mod builder;
 pub mod controls;
 pub mod coordinates;
 pub mod dem_mesh;
