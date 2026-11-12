@@ -6,14 +6,14 @@ use std::{
     thread,
 };
 
-struct Server {
-    url: String,
+pub(super) struct Server {
+    pub(super) url: String,
     stop: Arc<AtomicBool>,
     thread: Option<thread::JoinHandle<()>>,
     hits: Arc<AtomicUsize>,
 }
 impl Server {
-    fn new(tile: Vec<u8>) -> Self {
+    pub(super) fn new(tile: Vec<u8>) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         listener.set_nonblocking(true).unwrap();
         let url = format!("http://{}", listener.local_addr().unwrap());
@@ -66,7 +66,7 @@ impl Drop for Server {
         self.thread.take().unwrap().join().unwrap();
     }
 }
-fn job() -> Job {
+pub(super) fn job() -> Job {
     let progress = Arc::new(Mutex::new(String::new()));
     Job {
         cancelled: Arc::new(AtomicBool::new(false)),

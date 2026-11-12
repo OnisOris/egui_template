@@ -153,7 +153,15 @@ fn region_details(
             )
             .clicked()
         {
-            import.start_automatic(active);
+            if import.prepared.as_ref().is_some_and(|p| {
+                active
+                    .get()
+                    .is_some_and(|(_, r)| p.data.manifest.matches(r))
+            }) {
+                runtime.real_requested = true;
+            } else {
+                import.start_automatic(active);
+            }
             return_open = true;
         }
         ui.menu_button("More…", |ui| {

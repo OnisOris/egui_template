@@ -1,5 +1,5 @@
 //! Single lazy worker with one replaceable pending request; never wait for HTTP in Update.
-use super::{Config, Job, cache, dem, download::Download};
+use super::{Config, Job, cache, dem, download::Download, imagery};
 use crate::map::{
     RegionRuntime, dem_mesh,
     loading::{PreparedTerrain, TerrainImport},
@@ -27,9 +27,14 @@ struct Pending {
     request: Option<Request>,
     shutdown: bool,
 }
+enum Output {
+    Terrain(PreparedTerrain),
+    Satellite(Box<crate::map::satellite::SatellitePayload>, blake3::Hash),
+    Done(String),
+}
 struct Worker {
     pending: Arc<(Mutex<Pending>, Condvar)>,
-    results: Mutex<mpsc::Receiver<(RequestKey, Result<PreparedTerrain, String>)>>,
+    results: Mutex<mpsc::Receiver<(RequestKey, Result<Output, String>)>>,
 }
 #[derive(Default)]
 pub struct MapPackageBuilder {
@@ -81,7 +86,7 @@ impl MapPackageBuilder {
         self.job = Some(job);
         self.loading = true;
     }
-    fn poll(&mut self, active: &ActiveMapRegion) -> Option<Result<PreparedTerrain, String>> {
+    fn poll(&mut self, active: &ActiveMapRegion) -> Option<Result<Output, String>> {
         if self
             .current
             .is_some_and(|k| active.get() != Some((k.region_revision, k.region)))
@@ -92,7 +97,7 @@ impl MapPackageBuilder {
         while let Ok((key, result)) = worker.results.lock().unwrap().try_recv() {
             if self.current == Some(key) && active.get() == Some((key.region_revision, key.region))
             {
-                self.loading = false;
+                self.loading = matches!(&result, Ok(Output::Terrain(_)));
                 return Some(result);
             }
         }
@@ -135,7 +140,8 @@ impl Worker {
                         config.validate()?;
                         let http = http.as_mut().map_err(|e| e.clone())?;
                         http.parallelism = config.http_parallelism;
-                        let data = dem::build(key.region, &config, &cache::root()?, http, &job)?;
+                        let root = cache::root()?;
+                        let data = dem::build(key.region, &config, &root, http, &job)?;
                         job.check()?;
                         let meshes = dem_mesh::chunks(&data);
                         let grid = Some(dem_mesh::grid(&data));
@@ -145,10 +151,47 @@ impl Worker {
                             data.manifest.spacing_y_m,
                             data.manifest.reference_elevation_source
                         ));
-                        Ok(PreparedTerrain { data, meshes, grid })
+                        Ok((PreparedTerrain { data, meshes, grid }, config, root))
                     })();
-                    if send.send((key, result)).is_err() {
-                        break;
+                    match result {
+                        Ok((prepared, config, root)) => {
+                            let data = prepared.data.clone();
+                            if send.send((key, Ok(Output::Terrain(prepared)))).is_err() {
+                                break;
+                            }
+                            let satellite = imagery::configured().and_then(|provider| {
+                                provider
+                                    .map(|p| {
+                                        imagery::build(
+                                            &data,
+                                            &p,
+                                            &config,
+                                            &root,
+                                            http.as_ref().map_err(Clone::clone)?,
+                                            &job,
+                                        )
+                                    })
+                                    .transpose()
+                            });
+                            let output = match satellite {
+                                Ok(Some(payload)) => {
+                                    Output::Satellite(Box::new(payload), data.fingerprint)
+                                }
+                                Ok(None) => {
+                                    Output::Done("Partial · Satellite source not configured".into())
+                                }
+                                Err(e) => Output::Done(format!("Partial · {e}")),
+                            };
+                            if send.send((key, Ok(output))).is_err() {
+                                break;
+                            }
+                        }
+                        Err(e) => {
+                            job.status("Failed".into());
+                            if send.send((key, Err(e))).is_err() {
+                                break;
+                            }
+                        }
                     }
                 }
             })
@@ -172,13 +215,38 @@ pub fn poll_builder(
     active: Res<ActiveMapRegion>,
     mut import: ResMut<TerrainImport>,
     mut runtime: ResMut<RegionRuntime>,
+    mut scene: ResMut<crate::map::real_scene::RealScene>,
+    mut assets: crate::map::real_scene::SceneAssets,
 ) {
     if let Some(result) = import.builder.poll(&active) {
         match result {
-            Ok(prepared) => {
+            Ok(Output::Terrain(prepared)) => {
                 import.prepared = Some(prepared);
                 import.error = None;
                 runtime.real_requested = true;
+            }
+            Ok(Output::Satellite(payload, terrain)) => {
+                if scene.fingerprint() == Some(terrain)
+                    && scene.revision == active.get().map(|(r, _)| r)
+                {
+                    match crate::map::satellite_scene::install(&mut scene, &mut assets, *payload) {
+                        Ok(()) => {
+                            if let Some(job) = &import.builder.job {
+                                job.status("Ready".into());
+                            }
+                        }
+                        Err(e) => {
+                            if let Some(job) = &import.builder.job {
+                                job.status(format!("Partial · {e}"));
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(Output::Done(message)) => {
+                if let Some(job) = &import.builder.job {
+                    job.status(message);
+                }
             }
             Err(error) => import.error = Some(error),
         }
@@ -186,52 +254,5 @@ pub fn poll_builder(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn late_results_and_same_region_new_request_cannot_replace_scene() {
-        let mut active = ActiveMapRegion::default();
-        let region = super::super::tests::region();
-        active.confirm(region).unwrap();
-        let key = RequestKey {
-            request_id: 1,
-            region_revision: 1,
-            region,
-        };
-        let (send, recv) = mpsc::channel();
-        let mut builder = MapPackageBuilder {
-            worker: Some(Worker {
-                pending: Arc::new((Mutex::new(Pending::default()), Condvar::new())),
-                results: Mutex::new(recv),
-            }),
-            current: Some(key),
-            job: None,
-            serial: 0,
-            loading: false,
-        };
-        send.send((
-            RequestKey {
-                request_id: 0,
-                ..key
-            },
-            Err("stale".into()),
-        ))
-        .unwrap();
-        assert!(builder.poll(&active).is_none());
-        active.confirm(region).unwrap();
-        send.send((key, Err("old revision".into()))).unwrap();
-        assert!(builder.poll(&active).is_none());
-        assert!(builder.current.is_none());
-        let key = RequestKey {
-            request_id: 2,
-            region_revision: 2,
-            region,
-        };
-        builder.current = Some(key);
-        send.send((key, Err("current error".into()))).unwrap();
-        assert_eq!(
-            builder.poll(&active).unwrap().err().as_deref(),
-            Some("current error")
-        );
-    }
-}
+#[path = "runtime_tests.rs"]
+mod tests;

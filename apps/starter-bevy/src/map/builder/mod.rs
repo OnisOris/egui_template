@@ -3,6 +3,7 @@ pub mod cache;
 pub mod coverage;
 pub mod dem;
 pub mod download;
+pub mod imagery;
 pub mod provider;
 pub mod runtime;
 
@@ -20,11 +21,19 @@ pub struct Config {
     pub max_samples: usize,
     pub max_tiles: usize,
     pub http_parallelism: usize,
+    pub imagery_step_m: f64,
+    pub imagery_max_edge: u32,
+    pub imagery_max_pixels: u32,
+    pub jpeg_quality: u8,
     pub terrain_tilejson: String,
 }
 impl Default for Config {
     fn default() -> Self {
         Self {
+            imagery_step_m: 3.0,
+            imagery_max_edge: 4096,
+            imagery_max_pixels: 16_777_216,
+            jpeg_quality: 90,
             step_m: 25.0,
             max_edge: 1025,
             max_samples: 2_097_152,
@@ -36,7 +45,12 @@ impl Default for Config {
 }
 impl Config {
     pub fn validate(&self) -> Result<(), String> {
-        if !self.step_m.is_finite()
+        if !self.imagery_step_m.is_finite()
+            || self.imagery_step_m <= 0.0
+            || !(1..=4096).contains(&self.imagery_max_edge)
+            || !(1..=16_777_216).contains(&self.imagery_max_pixels)
+            || !(1..=100).contains(&self.jpeg_quality)
+            || !self.step_m.is_finite()
             || self.step_m < 0.01
             || !(2..=1025).contains(&self.max_edge)
             || !(4..=2_097_152).contains(&self.max_samples)
@@ -71,3 +85,6 @@ mod tests;
 
 #[cfg(test)]
 mod network_tests;
+
+#[cfg(test)]
+mod imagery_tests;

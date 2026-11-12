@@ -19,7 +19,8 @@ impl ImageryProvider {
         if !self.allow_permanent_packages {
             return Err("Satellite source does not permit permanent packages".into());
         }
-        if url.scheme() != "https"
+        if (url.scheme() != "https"
+            && !(url.scheme() == "http" && url.host_str() == Some("127.0.0.1")))
             || url.host_str() == Some("tile.openstreetmap.org")
             || !url.username().is_empty()
             || url.password().is_some()

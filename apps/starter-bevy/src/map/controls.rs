@@ -95,12 +95,20 @@ pub fn viewport_bar(
             "{} × {} · {:.1}…{:.1} m MSL · {}",
             m.width, m.height, m.min_elevation_msl, m.max_elevation_msl, m.terrain_id
         ));
+        ui.small(format!(
+            "DEM step {:.1} × {:.1} m · Reference: {}",
+            m.spacing_x_m, m.spacing_y_m, m.reference_elevation_source
+        ));
         if scene.revision != active.get().map(|(r, _)| r) {
             ui.colored_label(
                 egui::Color32::YELLOW,
                 "Previous region remains visible. Import and open the new region to replace it.",
             );
         }
+    }
+    let builder_status = import.builder.status();
+    if !builder_status.is_empty() {
+        ui.label(builder_status);
     }
     if satellite.loading() {
         ui.label("Loading satellite JPEG… UI remains available.");
