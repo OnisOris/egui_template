@@ -155,6 +155,7 @@ pub fn install(
         fingerprint: payload.fingerprint,
     });
     scene.satellite_enabled = true;
+    scene.grid_enabled = false;
     Ok(())
 }
 

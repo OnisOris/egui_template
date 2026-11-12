@@ -134,8 +134,7 @@ pub fn layer_visibility(
 ) {
     for entity in &scene.entities {
         if let Ok((mut visibility, grid)) = objects.get_mut(*entity) {
-            let visible = project.document.layer(LayerKind::Terrain).visible
-                && (grid.is_none() || scene.grid_enabled);
+            let visible = project.document.layer(LayerKind::Terrain).visible && grid.is_none();
             *visibility = if visible {
                 Visibility::Inherited
             } else {

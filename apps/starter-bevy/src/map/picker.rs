@@ -34,6 +34,7 @@ pub struct MapPicker {
     pub view: MapViewState,
     pub selection: RegionSelectionState,
     pub tiles: Option<MapTiles>,
+    pub imagery: super::imagery_view::ImageryView,
 }
 
 pub fn initial_center() -> Position {
@@ -59,10 +60,22 @@ impl MapPicker {
         confirmed: Option<GeoBounds>,
         project: Option<&mut starter_core::ProjectState>,
     ) {
-        let tiles = self.tiles.as_mut().map(|tiles| {
-            tiles.begin_frame();
-            tiles as &mut dyn Tiles
-        });
+        let tiles: Option<&mut dyn Tiles> = if self.imagery.enabled {
+            self.imagery.tiles.as_mut().map(|tiles| {
+                tiles.poll();
+                let (min, max) = tiles.zoom_limits();
+                let _ = self
+                    .view
+                    .memory
+                    .set_zoom(self.view.memory.zoom().clamp(min, max));
+                tiles as &mut dyn Tiles
+            })
+        } else {
+            self.tiles.as_mut().map(|tiles| {
+                tiles.begin_frame();
+                tiles as &mut dyn Tiles
+            })
+        };
         let selecting =
             self.view.tool == Tool::Select && project.as_ref().is_none_or(|p| !p.placing_marker);
         let dragging = self.selection.drag_start.is_some();

@@ -84,13 +84,13 @@ fn setup_viewport(
     commands.spawn((
         AmbientLight {
             color: Color::WHITE,
-            brightness: 250.0,
+            brightness: 500.0,
             ..default()
         },
         Camera3d::default(),
         Camera {
             order: -1,
-            clear_color: ClearColorConfig::Custom(Color::srgb(0.02, 0.025, 0.035)),
+            clear_color: ClearColorConfig::Custom(Color::srgb(0.15, 0.17, 0.20)),
             ..default()
         },
         Projection::Perspective(PerspectiveProjection {

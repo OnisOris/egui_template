@@ -32,7 +32,7 @@ fn setup_scene(
 
     commands.spawn((
         DirectionalLight {
-            illuminance: 8_000.0,
+            illuminance: 10_000.0,
             shadow_maps_enabled: false,
             ..default()
         },

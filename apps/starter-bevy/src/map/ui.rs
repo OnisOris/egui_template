@@ -20,6 +20,7 @@ pub fn show(
     egui::Panel::top("map_tools").show(ui, |ui| {
         ui.heading("Map · Region picker");
         search_bar(ui, picker);
+        picker.imagery.controls(ui);
     });
     egui::ScrollArea::vertical()
         .id_salt("map_region_controls")
@@ -31,18 +32,19 @@ pub fn show(
         .min_size(38.0)
         .show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.hyperlink_to(
-                    "© OpenStreetMap contributors",
-                    "https://www.openstreetmap.org/copyright",
-                );
+                picker.imagery.attribution(ui);
                 if let Some(cursor) = picker.selection.cursor {
                     ui.monospace(format!("{:.6}°, {:.6}°", cursor.latitude, cursor.longitude));
                 }
                 if ui.small_button("Retry tiles").clicked() {
                     picker.tiles = None;
+                    if picker.imagery.enabled {
+                        picker.imagery.retry();
+                    }
                 }
             });
-            if let Some(tiles) = picker.tiles.as_mut()
+            if !picker.imagery.enabled
+                && let Some(tiles) = picker.tiles.as_mut()
                 && let Some(status) = tiles.status()
             {
                 ui.colored_label(Color32::from_rgb(234, 180, 80), status);
@@ -62,9 +64,11 @@ pub fn show(
         }
         picker.view.fit_requested = false;
     }
-    picker
-        .tiles
-        .get_or_insert_with(|| MapTiles::new(ui.ctx().clone()));
+    if !picker.imagery.enabled {
+        picker
+            .tiles
+            .get_or_insert_with(|| MapTiles::new(ui.ctx().clone()));
+    }
     if project.placing_marker {
         ui.label("Click the map to place Marker · Escape to cancel");
     }

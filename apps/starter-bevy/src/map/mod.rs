@@ -3,6 +3,9 @@ pub mod controls;
 pub mod coordinates;
 pub mod dem_mesh;
 pub mod demo;
+mod grid_style;
+pub mod imagery_tiles;
+pub mod imagery_view;
 pub mod loading;
 mod marker_overlay;
 pub mod objects;
@@ -40,7 +43,8 @@ pub enum SceneMode {
 pub struct MapPlugin;
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_non_send(MapPicker::default())
+        app.init_gizmo_group::<grid_style::TerrainGridStyle>()
+            .insert_non_send(MapPicker::default())
             .init_resource::<objects::MarkerScene>()
             .init_resource::<ActiveMapRegion>()
             .init_resource::<RegionRuntime>()
@@ -48,7 +52,7 @@ impl Plugin for MapPlugin {
             .init_resource::<loading::TerrainImport>()
             .init_resource::<real_scene::RealScene>()
             .init_resource::<satellite_scene::SatelliteImport>()
-            .add_systems(Startup, loading::import_from_env)
+            .add_systems(Startup, (loading::import_from_env, grid_style::setup))
             .add_systems(
                 Update,
                 (
@@ -60,6 +64,7 @@ impl Plugin for MapPlugin {
                     satellite_scene::update_material,
                     real_scene::grid_visibility,
                     objects::sync,
+                    grid_style::draw,
                 )
                     .chain(),
             );
@@ -77,3 +82,6 @@ mod satellite_tests;
 
 #[cfg(test)]
 mod object_tests;
+
+#[cfg(test)]
+mod imagery_tile_tests;
