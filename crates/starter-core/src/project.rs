@@ -221,6 +221,15 @@ mod tests {
     fn empty_project_and_roundtrip_preserve_stable_markers_and_layers() {
         let mut state = ProjectState::default();
         assert!(state.document.objects.is_empty());
+        let bounds = crate::GeoBounds {
+            west: 7.0,
+            east: 8.0,
+            south: 46.0,
+            north: 47.0,
+        };
+        state.document.map_region = Some(MapRegion::new(bounds, bounds.center()).unwrap());
+        state.document.layer_mut(LayerKind::Satellite).visible = false;
+        state.document.layer_mut(LayerKind::Terrain).package_id = Some("cached-terrain".into());
         let id = state
             .add_marker(GeoOrigin {
                 latitude: 46.0,

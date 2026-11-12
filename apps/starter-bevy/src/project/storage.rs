@@ -38,24 +38,6 @@ pub fn asset_path(root: &Path, path: &str) -> Result<PathBuf, String> {
     }
     Ok(resolved)
 }
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn atomic_project_roundtrip_and_corruption() {
-        let root = tempfile::tempdir().unwrap();
-        let path = root.path().join("project.json");
-        let doc = ProjectDocument::default();
-        save(&path, &doc).unwrap();
-        assert_eq!(load(&path).unwrap(), doc);
-        let mut bad = doc.clone();
-        bad.schema_version = 100;
-        assert!(save(&path, &bad).is_err());
-        assert_eq!(load(&path).unwrap(), doc);
-        fs::write(&path, b"broken").unwrap();
-        assert!(load(&path).is_err());
-    }
-}
 
 pub fn save_as(path: &Path, old: Option<&Path>, document: &ProjectDocument) -> Result<(), String> {
     let root = path.parent().ok_or("Missing project directory")?;
@@ -110,4 +92,23 @@ pub fn import_asset(root: &Path, source: &Path) -> Result<starter_core::ProjectA
         media_type: if texture { "Texture" } else { "Model / file" }.into(),
         size,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn atomic_project_roundtrip_and_corruption() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("project.json");
+        let doc = ProjectDocument::default();
+        save(&path, &doc).unwrap();
+        assert_eq!(load(&path).unwrap(), doc);
+        let mut bad = doc.clone();
+        bad.schema_version = 100;
+        assert!(save(&path, &bad).is_err());
+        assert_eq!(load(&path).unwrap(), doc);
+        fs::write(&path, b"broken").unwrap();
+        assert!(load(&path).is_err());
+    }
 }

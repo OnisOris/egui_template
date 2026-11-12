@@ -4,6 +4,8 @@ pub mod coordinates;
 pub mod dem_mesh;
 pub mod demo;
 pub mod loading;
+mod marker_overlay;
+pub mod objects;
 pub mod picker;
 pub mod real_scene;
 pub mod region;
@@ -39,6 +41,7 @@ pub struct MapPlugin;
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
         app.insert_non_send(MapPicker::default())
+            .init_resource::<objects::MarkerScene>()
             .init_resource::<ActiveMapRegion>()
             .init_resource::<RegionRuntime>()
             .init_resource::<demo::DemoScene>()
@@ -56,6 +59,7 @@ impl Plugin for MapPlugin {
                     satellite_scene::poll_satellite,
                     satellite_scene::update_material,
                     real_scene::grid_visibility,
+                    objects::sync,
                 )
                     .chain(),
             );
@@ -70,3 +74,6 @@ mod dem_tests;
 
 #[cfg(test)]
 mod satellite_tests;
+
+#[cfg(test)]
+mod object_tests;

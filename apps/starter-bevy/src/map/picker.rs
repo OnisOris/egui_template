@@ -43,11 +43,28 @@ pub fn initial_center() -> Position {
 impl MapPicker {
     /// `tiles = None` is also useful for offline input tests without HTTP traffic.
     pub fn show_map(&mut self, ui: &mut Ui, confirmed: Option<GeoBounds>) {
+        self.show_overlay(ui, confirmed, None);
+    }
+    pub fn show_project_map(
+        &mut self,
+        ui: &mut Ui,
+        confirmed: Option<GeoBounds>,
+        project: &mut starter_core::ProjectState,
+    ) {
+        self.show_overlay(ui, confirmed, Some(project));
+    }
+    fn show_overlay(
+        &mut self,
+        ui: &mut Ui,
+        confirmed: Option<GeoBounds>,
+        project: Option<&mut starter_core::ProjectState>,
+    ) {
         let tiles = self.tiles.as_mut().map(|tiles| {
             tiles.begin_frame();
             tiles as &mut dyn Tiles
         });
-        let selecting = self.view.tool == Tool::Select;
+        let selecting =
+            self.view.tool == Tool::Select && project.as_ref().is_none_or(|p| !p.placing_marker);
         let dragging = self.selection.drag_start.is_some();
         Map::new(tiles, &mut self.view.memory, initial_center())
             .zoom_with_ctrl(false)
@@ -68,6 +85,9 @@ impl MapPicker {
                     );
                 }
                 self.selection.overlay(ui, response, projector, selecting);
+                if let Some(project) = project {
+                    super::marker_overlay::show(ui, response, projector, project, selecting);
+                }
             });
     }
 }

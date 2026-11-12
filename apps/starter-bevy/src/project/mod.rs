@@ -31,7 +31,11 @@ impl Plugin for ProjectPlugin {
                     .chain()
                     .before(crate::map::loading::poll_import),
             )
-            .add_systems(Update, io::close_requested);
+            .add_systems(Update, io::close_requested)
+            .add_systems(
+                Update,
+                scene::layer_visibility.after(crate::map::real_scene::grid_visibility),
+            );
         app.world_mut().resource_mut::<ProjectIo>().benchmark =
             std::env::var_os("STARTER_LOAD").is_some();
     }

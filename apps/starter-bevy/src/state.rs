@@ -38,6 +38,8 @@ pub struct UiState {
     pub table: TableState,
     pub gallery: GalleryState,
     pub notice: Option<String>,
+    pub project_explorer: crate::ui::project_explorer::ExplorerState,
+    pub marker_table: crate::ui::project_table::TableState,
 }
 
 impl Default for UiState {
@@ -59,6 +61,8 @@ impl Default for UiState {
             table: TableState::default(),
             gallery: GalleryState::default(),
             notice: None,
+            project_explorer: Default::default(),
+            marker_table: Default::default(),
         }
     }
 }

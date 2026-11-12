@@ -13,7 +13,7 @@ pub fn show(
     document: &mut DocumentState,
     notice: &mut Option<String>,
     demo: bool,
-) {
+) -> bevy_egui::egui::Response {
     let (rect, response) = ui.allocate_exact_size(ui.available_size(), Sense::click_and_drag());
     let pixels_per_point = ui.ctx().pixels_per_point();
     let size = rect.size() * pixels_per_point;
@@ -164,6 +164,7 @@ pub fn show(
             viewport.camera.focus(picking::object_center(object));
         }
     }
+    response
 }
 
 fn apply(document: &mut DocumentState, notice: &mut Option<String>, command: Command) {

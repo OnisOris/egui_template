@@ -66,7 +66,10 @@ impl ProjectIo {
     fn execute(&mut self, action: ProjectAction, project: &mut ProjectState) {
         self.error = None;
         if action == ProjectAction::New {
-            *project = ProjectState::default();
+            *project = ProjectState {
+                revision: project.revision.wrapping_add(1),
+                ..Default::default()
+            };
             self.path = None;
             self.missing.clear();
             self.reset_scene = true;
@@ -145,6 +148,7 @@ pub fn poll(
             Ok(Completed::Opened(path, document, missing)) => {
                 project.0 = ProjectState {
                     document,
+                    revision: project.revision.wrapping_add(1),
                     ..Default::default()
                 };
                 io.path = Some(path);

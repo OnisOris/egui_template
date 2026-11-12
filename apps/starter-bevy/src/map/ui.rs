@@ -14,6 +14,7 @@ pub fn show(
     runtime: &mut RegionRuntime,
     import: &mut super::loading::TerrainImport,
     scene: &super::real_scene::RealScene,
+    project: &mut starter_core::ProjectState,
 ) -> bool {
     let mut open = false;
     egui::Panel::top("map_tools").show(ui, |ui| {
@@ -64,7 +65,10 @@ pub fn show(
     picker
         .tiles
         .get_or_insert_with(|| MapTiles::new(ui.ctx().clone()));
-    picker.show_map(ui, active.get().map(|(_, r)| r.bounds));
+    if project.placing_marker {
+        ui.label("Click the map to place Marker · Escape to cancel");
+    }
+    picker.show_project_map(ui, active.get().map(|(_, r)| r.bounds), project);
     open
 }
 

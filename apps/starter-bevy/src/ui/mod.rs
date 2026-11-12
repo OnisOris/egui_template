@@ -18,9 +18,14 @@ use crate::{
 pub mod chrome;
 pub mod gallery;
 pub mod panels;
+pub mod project_explorer;
+pub mod project_inspector;
+pub mod project_table;
 
 #[derive(bevy::ecs::system::SystemParam)]
 pub(crate) struct MapUi<'w> {
+    project: ResMut<'w, crate::project::Project>,
+    project_io: ResMut<'w, crate::project::ProjectIo>,
     picker: NonSendMut<'w, crate::map::picker::MapPicker>,
     active: ResMut<'w, crate::map::region::ActiveMapRegion>,
     runtime: ResMut<'w, crate::map::RegionRuntime>,
@@ -43,10 +48,10 @@ pub(crate) fn editor_ui(
     mut viewport: ResMut<ViewportState>,
     mut metrics: ResMut<EditorMetrics>,
     targets: RenderUi,
-    mut project: ResMut<crate::project::Project>,
-    mut project_io: ResMut<crate::project::ProjectIo>,
 ) -> Result {
     let MapUi {
+        mut project,
+        mut project_io,
         mut picker,
         mut active,
         mut runtime,
@@ -80,6 +85,8 @@ pub(crate) fn editor_ui(
             table,
             gallery,
             notice,
+            project_explorer,
+            marker_table,
         } = &mut *ui_state;
         if ctx.global_style().visuals.dark_mode != matches!(theme, Theme::Dark) {
             theme.apply(ctx);
@@ -98,6 +105,8 @@ pub(crate) fn editor_ui(
             panels::Panels {
                 project: &mut project,
                 project_io: &mut project_io,
+                project_explorer,
+                marker_table,
                 picker: &mut picker,
                 active: &mut active,
                 runtime: &mut runtime,
@@ -137,6 +146,7 @@ pub(crate) fn editor_ui(
             &mut project_io,
         );
     }
+    crate::map::objects::focus(&mut project, &mut picker, &real, &mut viewport);
     metrics.ui_ms = started.elapsed().as_secs_f32() * 1000.0;
     Ok(())
 }
@@ -151,6 +161,7 @@ fn apply(
     io: &mut crate::project::ProjectIo,
 ) {
     if runtime.mode != crate::map::SceneMode::Editor
+        && (io.benchmark || matches!(action, EditorAction::ResetView))
         && matches!(
             action,
             EditorAction::ResetView | EditorAction::FocusSelection
@@ -200,6 +211,9 @@ fn apply(
             } else {
                 project.delete_selected();
             }
+        }
+        EditorAction::FocusSelection if !io.benchmark => {
+            project.focus_selected = true;
         }
         EditorAction::FocusSelection => {
             if let Some(object) = document.selected_object() {

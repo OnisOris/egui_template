@@ -113,11 +113,34 @@ pub fn sync_project(
             ),
         ] {
             let layer = project.document.layer_mut(kind);
-            if layer.package_id != id {
-                layer.package_id = id;
+            if let Some(id) = id
+                && layer.package_id.as_ref() != Some(&id)
+            {
+                layer.package_id = Some(id);
                 project.changed();
             }
         }
     }
     scene.satellite_enabled &= project.document.layer(LayerKind::Satellite).visible;
+}
+
+pub fn layer_visibility(
+    project: Res<Project>,
+    scene: Res<RealScene>,
+    mut objects: Query<(
+        &mut Visibility,
+        Option<&crate::map::real_scene::TerrainGrid>,
+    )>,
+) {
+    for entity in &scene.entities {
+        if let Ok((mut visibility, grid)) = objects.get_mut(*entity) {
+            let visible = project.document.layer(LayerKind::Terrain).visible
+                && (grid.is_none() || scene.grid_enabled);
+            *visibility = if visible {
+                Visibility::Inherited
+            } else {
+                Visibility::Hidden
+            };
+        }
+    }
 }
