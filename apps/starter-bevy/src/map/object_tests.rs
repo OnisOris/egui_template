@@ -75,6 +75,7 @@ fn walkers_click_places_and_selects_the_document_marker_offline() {
     use bevy_egui::egui::{self, Event, Modifiers, PointerButton, RawInput, pos2, vec2};
     let ctx = egui::Context::default();
     let mut picker = super::picker::MapPicker::default();
+    picker.view.tool = super::picker::Tool::Select;
     let mut project = ProjectState {
         placing_marker: true,
         ..Default::default()

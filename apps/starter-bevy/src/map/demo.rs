@@ -16,6 +16,26 @@ pub struct DemoScene {
     materials: Vec<Handle<StandardMaterial>>,
 }
 
+impl DemoScene {
+    pub fn clear(
+        &mut self,
+        commands: &mut Commands,
+        meshes: &mut Assets<Mesh>,
+        materials: &mut Assets<StandardMaterial>,
+    ) {
+        for entity in self.entities.drain(..) {
+            commands.entity(entity).despawn();
+        }
+        for mesh in self.meshes.drain(..) {
+            meshes.remove(mesh.id());
+        }
+        for material in self.materials.drain(..) {
+            materials.remove(material.id());
+        }
+        self.revision = None;
+    }
+}
+
 pub fn validate_demo(region: MapRegion) -> Result<(), &'static str> {
     MapRegion::new(region.bounds, region.origin)?;
     let (width, height) = region.bounds.dimensions();
@@ -55,15 +75,7 @@ pub fn open_region(
     let min = to_bevy(wgs84_to_local(region.origin, b.west, b.north));
     let max = to_bevy(wgs84_to_local(region.origin, b.east, b.south));
     if scene.revision != Some(revision) {
-        for entity in scene.entities.drain(..) {
-            commands.entity(entity).despawn();
-        }
-        for handle in scene.meshes.drain(..) {
-            meshes.remove(handle.id());
-        }
-        for handle in scene.materials.drain(..) {
-            materials.remove(handle.id());
-        }
+        scene.clear(&mut commands, &mut meshes, &mut materials);
         let terrain = meshes.add(terrain::surface(min, max));
         let grid = meshes.add(terrain::grid(min, max));
         let object = meshes.add(Cuboid::new(1.0, 1.0, 1.0));

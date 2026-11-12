@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "name": "Alps Survey",
+  "map_region": {
+    "bounds": {
+      "west": 7.837465238571172,
+      "south": 46.54807873471085,
+      "east": 8.043458890914922,
+      "north": 46.6610617840221
+    },
+    "origin": {
+      "longitude": 7.940462064743047,
+      "latitude": 46.604570259366476
+    }
+  },
+  "layers": [
+    {
+      "kind": "Terrain",
+      "visible": true,
+      "package_id": "9050e7829692c7e26a8963236bec3ca0b5f3a32391e029766dcb289b59fcfbe7"
+    },
+    {
+      "kind": "Satellite",
+      "visible": false,
+      "package_id": null
+    }
+  ],
+  "objects": [
+    {
+      "id": 1,
+      "name": "Survey Point",
+      "latitude": 46.6,
+      "longitude": 7.95,
+      "altitude_agl": 12.0,
+      "visible": true,
+      "color": [
+        240,
+        170,
+        55,
+        255
+      ]
+    }
+  ],
+  "assets": [],
+  "next_id": 2
+}

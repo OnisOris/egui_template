@@ -136,7 +136,9 @@ pub fn sync(
             )
         };
         let material = if let Some(h) = projection.materials.get(&id) {
-            if let Some(mut m) = materials.get_mut(h) {
+            if let Some(mut m) = materials.get_mut(h)
+                && m.base_color != color
+            {
                 m.base_color = color;
             }
             h.clone()
@@ -183,8 +185,12 @@ pub fn focus(
             .view
             .memory
             .center_at(walkers::lon_lat(marker.longitude, marker.latitude));
-        if let Some(data) = &scene.data
-            && let Some(p) = position(marker, data)
+        if let Some(data) = scene.data.as_ref().filter(|d| {
+            project
+                .document
+                .map_region
+                .is_some_and(|r| d.manifest.matches(r))
+        }) && let Some(p) = position(marker, data)
         {
             viewport.camera.focus(p);
             viewport.camera.distance = viewport.camera.distance.min(300.0);

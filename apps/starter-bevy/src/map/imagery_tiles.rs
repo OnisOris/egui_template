@@ -100,7 +100,16 @@ impl ImageryTiles {
                                     y: id.y,
                                 })
                                 .ok_or("Missing satellite tile")?;
-                            let image = decode(bytes, source.tile_size, false)?;
+                            let image =
+                                decode(bytes, source.tile_size, false).inspect_err(|_| {
+                                    if let Ok((_, root, _)) = &setup {
+                                        let _ =
+                                            std::fs::remove_file(root.join(format!(
+                                                "{}/{}/{}.tile",
+                                                id.zoom, id.x, id.y
+                                            )));
+                                    }
+                                })?;
                             Ok(egui::ColorImage::from_rgb(
                                 [source.tile_size as usize; 2],
                                 image.as_raw(),

@@ -7,15 +7,33 @@ use crate::{metrics::EditorMetrics, state::EditorAction, viewport::ProjectionMod
 pub fn show(
     ui: &mut Ui,
     workspace: &mut Workspace,
-    document: &DocumentState,
+    session: (&DocumentState, &starter_core::ProjectState, bool),
     metrics: &EditorMetrics,
     projection: ProjectionMode,
     sensitivity: &mut f32,
     notice: Option<&str>,
 ) -> Vec<EditorAction> {
+    let (document, project, benchmark) = session;
+    let count = if benchmark {
+        document.document().objects().len()
+    } else {
+        project.document.objects.len()
+    };
+    let selected = if benchmark {
+        document.selection().len()
+    } else {
+        usize::from(matches!(
+            project.selection,
+            starter_core::ProjectSelection::Marker(_)
+        ))
+    };
     let mut actions = menu(ui, workspace, projection, sensitivity);
-    actions.extend(toolbar(ui, document.document().objects().len(), projection));
-    status(ui, document, metrics, projection, notice);
+    actions.extend(toolbar(
+        ui,
+        (count, &project.document.name, project.dirty, benchmark),
+        projection,
+    ));
+    status(ui, (count, selected), metrics, projection, notice);
     actions
 }
 
@@ -106,14 +124,36 @@ fn menu(
     actions
 }
 
-fn toolbar(ui: &mut Ui, objects: usize, projection: ProjectionMode) -> Vec<EditorAction> {
+fn toolbar(
+    ui: &mut Ui,
+    session: (usize, &str, bool, bool),
+    projection: ProjectionMode,
+) -> Vec<EditorAction> {
+    let (objects, name, dirty, benchmark) = session;
     let mut actions = Vec::new();
     egui::Panel::top("bevy_toolbar").show(ui, |ui| {
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
+            if benchmark {
+                ui.strong("Demo / Benchmark");
+                if ui.button("Return to Project").clicked() {
+                    actions.push(EditorAction::ExitDemo);
+                }
+            } else {
+                ui.strong(name);
+                if dirty {
+                    ui.label("●");
+                }
+            }
+            if ui.button("Save").clicked() {
+                actions.push(EditorAction::Save);
+            }
             if ui.button("New").clicked() {
                 actions.push(EditorAction::New);
             }
-            if ui.button("+ Marker").clicked() {
+            if ui
+                .add_enabled(!benchmark, egui::Button::new("+ Marker"))
+                .clicked()
+            {
                 actions.push(EditorAction::AddObject);
             }
             if ui.button("Delete").clicked() {
@@ -133,7 +173,7 @@ fn toolbar(ui: &mut Ui, objects: usize, projection: ProjectionMode) -> Vec<Edito
                 actions.push(EditorAction::ToggleProjection);
             }
             ui.separator();
-            ui.label(format!("{objects} benchmark objects"));
+            ui.label(format!("{objects} objects"));
         });
     });
     actions
@@ -141,7 +181,7 @@ fn toolbar(ui: &mut Ui, objects: usize, projection: ProjectionMode) -> Vec<Edito
 
 fn status(
     ui: &mut Ui,
-    document: &DocumentState,
+    counts: (usize, usize),
     metrics: &EditorMetrics,
     projection: ProjectionMode,
     notice: Option<&str>,
@@ -160,11 +200,10 @@ fn status(
             ui.separator();
             ui.label(format!(
                 "Objects {} · entities {}",
-                document.document().objects().len(),
-                metrics.projected_entities
+                counts.0, metrics.projected_entities
             ));
             ui.separator();
-            ui.label(format!("Selected {}", document.selection().len()));
+            ui.label(format!("Selected {}", counts.1));
             ui.separator();
             ui.label(projection.label());
             ui.weak("GPU frame time not exposed");

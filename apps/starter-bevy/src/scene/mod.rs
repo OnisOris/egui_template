@@ -16,7 +16,11 @@ impl Plugin for ScenePlugin {
             .add_systems(Startup, setup_scene)
             .add_systems(
                 Update,
-                (sync::sync_scene, grid::draw_grid, grid::draw_selection),
+                (
+                    sync::sync_scene.after(crate::project::scene::sync_project),
+                    grid::draw_grid,
+                    grid::draw_selection,
+                ),
             );
     }
 }

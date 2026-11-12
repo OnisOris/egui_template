@@ -35,6 +35,22 @@ pub fn show(
                 "Saved"
             });
         }
+        ProjectSelection::Manifest => {
+            ui.strong("Project JSON");
+            ui.label(
+                io.path
+                    .as_ref()
+                    .and_then(|p| p.file_name())
+                    .and_then(|p| p.to_str())
+                    .unwrap_or("project.json"),
+            );
+            ui.label("application/json");
+            ui.label(
+                io.file_size
+                    .map(|size| format!("{size} bytes"))
+                    .unwrap_or("Not saved".into()),
+            );
+        }
         ProjectSelection::Layer(kind) => {
             ui.strong(format!("{kind:?}"));
             let mut visible = project.document.layer(kind).visible;
@@ -104,12 +120,13 @@ pub fn show(
                 {
                     ui.colored_label(ui.visuals().error_fg_color, e);
                 }
-                if let Some(data) = &real.data
-                    && let Some(h) = crate::map::objects::terrain_elevation(
-                        data,
-                        marker.longitude,
-                        marker.latitude,
-                    )
+                if let Some(data) = real.data.as_ref().filter(|d| {
+                    project
+                        .document
+                        .map_region
+                        .is_some_and(|r| d.manifest.matches(r))
+                }) && let Some(h) =
+                    crate::map::objects::terrain_elevation(data, marker.longitude, marker.latitude)
                 {
                     ui.label(format!("Terrain {:.2} m MSL", h));
                 } else {

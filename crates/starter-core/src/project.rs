@@ -156,6 +156,7 @@ pub fn relative_path(path: &str) -> bool {
 pub enum ProjectSelection {
     #[default]
     Project,
+    Manifest,
     Layer(LayerKind),
     Marker(ObjectId),
     Asset(usize),
@@ -176,6 +177,9 @@ impl ProjectState {
     }
     pub fn add_marker(&mut self, point: GeoOrigin) -> Result<ObjectId, String> {
         point.validate()?;
+        if self.document.objects.len() >= 100_000 {
+            return Err("Marker limit reached".into());
+        }
         let id = ObjectId(self.document.next_id);
         self.document.next_id = id.0.checked_add(1).ok_or("Marker IDs exhausted")?;
         self.document.objects.push(MapMarker {

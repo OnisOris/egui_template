@@ -168,7 +168,7 @@ mod tests {
 
     #[test]
     fn projection_is_stable_when_position_changes() {
-        let mut world = test_world(DocumentResource::default());
+        let mut world = test_world(DocumentResource(starter_core::DocumentState::default()));
         run_sync(&mut world);
         let before = world.resource::<SceneSync>().entries[&ObjectId(1)].entity;
 
@@ -191,7 +191,7 @@ mod tests {
 
     #[test]
     fn deleting_an_object_despawns_it() {
-        let mut world = test_world(DocumentResource::default());
+        let mut world = test_world(DocumentResource(starter_core::DocumentState::default()));
         run_sync(&mut world);
         let entity = world.resource::<SceneSync>().entries[&ObjectId(1)].entity;
 
@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn adding_an_object_creates_one_entity() {
-        let mut world = test_world(DocumentResource::default());
+        let mut world = test_world(DocumentResource(starter_core::DocumentState::default()));
         run_sync(&mut world);
 
         world
@@ -231,7 +231,7 @@ mod tests {
 
     #[test]
     fn switching_load_rebuilds_the_projection() {
-        let mut world = test_world(DocumentResource::default());
+        let mut world = test_world(DocumentResource(starter_core::DocumentState::default()));
         run_sync(&mut world);
 
         world
@@ -245,5 +245,18 @@ mod tests {
             world.query::<&ProjectedObject>().iter(&world).count(),
             1_000
         );
+    }
+    #[test]
+    fn ten_thousand_demo_entities_still_project_with_a_bounded_asset_palette() {
+        let mut doc = DocumentResource::empty();
+        doc.dispatch(Command::LoadTestScene(10_000)).unwrap();
+        let mut world = test_world(doc);
+        run_sync(&mut world);
+        assert_eq!(world.resource::<SceneSync>().entries.len(), 10_000);
+        println!(
+            "M4 CPU benchmark: 10000 entities, {:.3} ms",
+            world.resource::<EditorMetrics>().scene_build_ms
+        );
+        assert!(world.resource::<Assets<StandardMaterial>>().len() <= 180);
     }
 }

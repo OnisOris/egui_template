@@ -85,3 +85,6 @@ mod object_tests;
 
 #[cfg(test)]
 mod imagery_tile_tests;
+
+#[cfg(test)]
+mod project_tests;

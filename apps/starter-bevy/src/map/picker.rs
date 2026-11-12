@@ -52,6 +52,10 @@ impl MapPicker {
         confirmed: Option<GeoBounds>,
         project: &mut starter_core::ProjectState,
     ) {
+        if project.placing_marker {
+            self.view.tool = Tool::Pan;
+            self.selection.drag_start = None;
+        }
         self.show_overlay(ui, confirmed, Some(project));
     }
     fn show_overlay(

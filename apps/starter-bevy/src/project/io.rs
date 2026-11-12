@@ -14,20 +14,24 @@ pub enum ProjectAction {
     Save,
     SaveAs,
     Import,
+    Refresh,
     Exit,
 }
 enum Completed {
-    Opened(PathBuf, ProjectDocument, Vec<bool>),
-    Saved(PathBuf, u64),
+    Opened(PathBuf, ProjectDocument, Vec<bool>, u64),
+    Saved(PathBuf, u64, u64),
     Imported(ProjectAsset),
+    Refreshed(Vec<bool>),
     Cancelled,
 }
 #[derive(Resource, Default)]
 pub struct ProjectIo {
     pub path: Option<PathBuf>,
+    pub file_size: Option<u64>,
     pub error: Option<String>,
     pub missing: Vec<bool>,
     pub benchmark: bool,
+    pub return_mode: crate::map::SceneMode,
     pub reset_scene: bool,
     pub restore: bool,
     pub exit: bool,
@@ -71,6 +75,7 @@ impl ProjectIo {
                 ..Default::default()
             };
             self.path = None;
+            self.file_size = None;
             self.missing.clear();
             self.reset_scene = true;
             self.benchmark = false;
@@ -97,7 +102,8 @@ impl ProjectIo {
                         .iter()
                         .map(|a| storage::asset_path(root, &a.path).is_err())
                         .collect();
-                    Ok(Completed::Opened(path, document, missing))
+                    let size = path.metadata().map_err(|e| e.to_string())?.len();
+                    Ok(Completed::Opened(path, document, missing, size))
                 }
                 ProjectAction::Save | ProjectAction::SaveAs => {
                     let path = if action == ProjectAction::Save {
@@ -115,7 +121,19 @@ impl ProjectIo {
                         return Ok(Completed::Cancelled);
                     };
                     storage::save_as(&path, old.as_deref(), &snapshot)?;
-                    Ok(Completed::Saved(path, revision))
+                    let size = path.metadata().map_err(|e| e.to_string())?.len();
+                    Ok(Completed::Saved(path, revision, size))
+                }
+                ProjectAction::Refresh => {
+                    let path = old.ok_or("Save the project first")?;
+                    let root = path.parent().ok_or("Missing project directory")?;
+                    Ok(Completed::Refreshed(
+                        snapshot
+                            .assets
+                            .iter()
+                            .map(|a| storage::asset_path(root, &a.path).is_err())
+                            .collect(),
+                    ))
                 }
                 ProjectAction::Import => {
                     let path = old.ok_or("Save the project before importing assets")?;
@@ -145,7 +163,8 @@ pub fn poll(
     if let Some(result) = result {
         io.task = None;
         match result {
-            Ok(Completed::Opened(path, document, missing)) => {
+            Ok(Completed::Opened(path, document, missing, size)) => {
+                io.file_size = Some(size);
                 project.0 = ProjectState {
                     document,
                     revision: project.revision.wrapping_add(1),
@@ -157,7 +176,8 @@ pub fn poll(
                 io.restore = true;
                 io.benchmark = false;
             }
-            Ok(Completed::Saved(path, revision)) => {
+            Ok(Completed::Saved(path, revision, size)) => {
+                io.file_size = Some(size);
                 io.path = Some(path);
                 if project.revision == revision {
                     project.dirty = false;
@@ -175,6 +195,7 @@ pub fn poll(
                 project.changed();
                 io.missing.push(false);
             }
+            Ok(Completed::Refreshed(missing)) => io.missing = missing,
             Ok(Completed::Cancelled) => {
                 io.continuation = None;
             }

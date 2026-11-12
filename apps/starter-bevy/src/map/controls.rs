@@ -36,6 +36,7 @@ pub fn viewport_bar(
         &mut super::satellite_scene::SatelliteImport,
     ),
     scene: &mut RealScene,
+    benchmark: bool,
 ) {
     let (import, satellite) = imports;
     ui.horizontal_wrapped(|ui| {
@@ -43,7 +44,8 @@ pub fn viewport_bar(
             SceneMode::Demo => "Demo · synthetic",
             SceneMode::Real if scene.satellite_enabled => "Real DEM · Satellite",
             SceneMode::Real => "Real DEM · Terrain",
-            SceneMode::Editor => "Editor",
+            SceneMode::Editor if benchmark => "Demo / Benchmark",
+            SceneMode::Editor => "Project",
         });
         if runtime.mode == SceneMode::Real {
             if let Some(data) = &scene.data {
@@ -82,10 +84,6 @@ pub fn viewport_bar(
         }
         if ui.small_button("Import DEM…").clicked() {
             import.start(active, None, scene.fingerprint());
-        }
-        if ui.small_button("Editor scene").clicked() {
-            runtime.mode = SceneMode::Editor;
-            viewport.drag = None;
         }
     });
     if runtime.mode == SceneMode::Real

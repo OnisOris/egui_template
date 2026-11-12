@@ -5,7 +5,14 @@ use starter_ui::TreeViewBuilder;
 
 pub fn build(b: &mut TreeViewBuilder<'_, Node>, project: &Project, io: &ProjectIo) {
     if b.dir(Node::Project, &project.document.name) {
-        b.leaf(Node::Manifest, "project.json");
+        b.leaf(
+            Node::Manifest,
+            io.path
+                .as_ref()
+                .and_then(|p| p.file_name())
+                .and_then(|p| p.to_str())
+                .unwrap_or("project.json [unsaved]"),
+        );
         if b.dir(Node::Assets, "Assets") {
             for (node, name, prefix) in [
                 (Node::Models, "Models", "Assets/Models/"),

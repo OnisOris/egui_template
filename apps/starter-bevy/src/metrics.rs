@@ -84,7 +84,17 @@ pub fn bench_edit(
     }
 }
 
-pub fn update_metrics(time: Res<Time>, mut metrics: ResMut<EditorMetrics>) {
+pub fn update_metrics(
+    time: Res<Time>,
+    mut metrics: ResMut<EditorMetrics>,
+    project: Res<crate::project::Project>,
+    io: Res<crate::project::ProjectIo>,
+    markers: Res<crate::map::objects::MarkerScene>,
+) {
+    if !io.benchmark {
+        metrics.objects = project.document.objects.len();
+        metrics.projected_entities = markers.entities.len();
+    }
     let delta = time.delta_secs();
     metrics.elapsed += delta;
     metrics.frames += 1;

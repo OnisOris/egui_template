@@ -6,8 +6,14 @@ use starter_ui::{ExplorerNodeId, ExplorerTree, InspectorState, TableState, Theme
 
 use crate::ui::gallery::GalleryState;
 
-#[derive(Resource, Default)]
+#[derive(Resource)]
 pub struct DocumentResource(pub DocumentState);
+
+impl Default for DocumentResource {
+    fn default() -> Self {
+        Self::empty()
+    }
+}
 
 impl DocumentResource {
     pub fn empty() -> Self {
@@ -91,7 +97,7 @@ mod tests {
     use super::*;
     #[test]
     fn normal_workspace_is_empty_and_legacy_desktop_default_is_unchanged() {
-        assert!(DocumentResource::empty().document().objects().is_empty());
+        assert!(DocumentResource::default().document().objects().is_empty());
         assert_eq!(DocumentState::default().document().objects().len(), 100);
         let mut benchmark = DocumentResource::empty();
         let project = starter_core::ProjectState::default();

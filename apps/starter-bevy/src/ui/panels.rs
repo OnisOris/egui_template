@@ -63,6 +63,10 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
         PanelId::Map => {
             map_visible = true;
             open = crate::map::ui::show(panel_ui, picker, active, runtime, import, real, project);
+            if open && project_io.benchmark {
+                project_io.benchmark = false;
+                commands.push(Command::NewDocument);
+            }
         }
         PanelId::Explorer => {
             if project_io.benchmark {
@@ -89,6 +93,7 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
                     active,
                     (import, satellite),
                     real,
+                    project_io.benchmark,
                 );
                 if mode != runtime.mode && runtime.mode == crate::map::SceneMode::Editor {
                     viewport

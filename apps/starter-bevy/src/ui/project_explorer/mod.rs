@@ -28,6 +28,7 @@ impl Node {
     fn selected(s: &ProjectSelection) -> Self {
         match s {
             ProjectSelection::Project => Self::Project,
+            ProjectSelection::Manifest => Self::Manifest,
             ProjectSelection::Layer(k) => Self::Layer(*k),
             ProjectSelection::Marker(id) => Self::Marker(*id),
             ProjectSelection::Asset(i) => Self::File(*i),
@@ -38,6 +39,7 @@ impl Node {
             Self::Layer(k) => ProjectSelection::Layer(*k),
             Self::Marker(id) => ProjectSelection::Marker(*id),
             Self::File(i) => ProjectSelection::Asset(*i),
+            Self::Manifest => ProjectSelection::Manifest,
             _ => ProjectSelection::Project,
         }
     }
@@ -62,6 +64,7 @@ pub fn show(
                 ("Save", ProjectAction::Save),
                 ("Save As…", ProjectAction::SaveAs),
                 ("Import…", ProjectAction::Import),
+                ("Refresh", ProjectAction::Refresh),
             ] {
                 if ui.small_button(label).clicked() {
                     io.request(action, project);

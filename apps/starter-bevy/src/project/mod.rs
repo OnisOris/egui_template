@@ -1,5 +1,5 @@
 mod io;
-mod scene;
+pub(crate) mod scene;
 pub mod storage;
 pub mod ui;
 use bevy::prelude::*;

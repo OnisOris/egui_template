@@ -66,7 +66,7 @@ pub(crate) fn editor_ui(
     let started = Instant::now();
     crate::project::ui::unsaved(contexts.ctx_mut()?, &mut project_io, &mut project);
     let projection = viewport.camera.projection;
-    let actions;
+    let mut actions;
     let commands;
     {
         let ctx = contexts.ctx_mut()?;
@@ -77,6 +77,9 @@ pub(crate) fn editor_ui(
                 .layer_id(egui::LayerId::background())
                 .max_rect(ctx.viewport_rect()),
         );
+        if project_io.busy() || project_io.prompt.is_some() {
+            root.disable();
+        }
         let UiState {
             workspace,
             theme,
@@ -94,12 +97,18 @@ pub(crate) fn editor_ui(
         actions = chrome::show(
             &mut root,
             workspace,
-            &document,
+            (&document, &project, project_io.benchmark),
             &metrics,
             projection,
             &mut viewport.camera.sensitivity,
             notice.as_deref(),
         );
+        if !project_io.busy()
+            && project_io.prompt.is_none()
+            && ctx.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::S))
+        {
+            actions.push(EditorAction::Save);
+        }
         commands = panels::show(
             &mut root,
             panels::Panels {
@@ -171,6 +180,9 @@ fn apply(
         return;
     }
     if matches!(action, EditorAction::SetLoad(_)) {
+        if !io.benchmark {
+            io.return_mode = runtime.mode;
+        }
         runtime.mode = crate::map::SceneMode::Editor;
     }
     match action {
@@ -194,15 +206,15 @@ fn apply(
         EditorAction::ExitDemo => {
             io.benchmark = false;
             dispatch(document, &mut ui_state.notice, Command::NewDocument);
-            runtime.mode = if project.document.map_region.is_some() {
-                crate::map::SceneMode::Real
-            } else {
-                crate::map::SceneMode::Editor
-            };
+            runtime.mode = io.return_mode;
             crate::viewport::focus_geo(viewport);
         }
         EditorAction::AddObject => {
+            if io.benchmark {
+                return;
+            }
             project.placing_marker = true;
+            ui_state.workspace.ensure_panel(starter_ui::PanelId::Map);
             ui_state.workspace.activate(starter_ui::PanelId::Map);
         }
         EditorAction::DeleteSelection => {
@@ -234,6 +246,11 @@ fn apply(
         }
         EditorAction::SetLoad(size) => {
             io.benchmark = true;
+            project.placing_marker = false;
+            ui_state
+                .workspace
+                .ensure_panel(starter_ui::PanelId::Viewport);
+            ui_state.workspace.activate(starter_ui::PanelId::Viewport);
             dispatch(document, &mut ui_state.notice, Command::LoadTestScene(size));
             viewport.camera.reset(bounds(document));
         }
@@ -246,3 +263,9 @@ fn dispatch(document: &mut DocumentResource, notice: &mut Option<String>, comman
         Err(error) => *notice = Some(error.to_string()),
     }
 }
+
+#[cfg(test)]
+mod action_tests;
+
+#[cfg(test)]
+mod project_ui_tests;

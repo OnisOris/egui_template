@@ -17,6 +17,8 @@ pub struct MapProject<'w> {
     scene: ResMut<'w, RealScene>,
     satellite: ResMut<'w, SatelliteImport>,
     assets: SceneAssets<'w>,
+    picker: NonSendMut<'w, crate::map::picker::MapPicker>,
+    demo: ResMut<'w, crate::map::demo::DemoScene>,
 }
 pub fn sync_project(
     mut commands: Commands,
@@ -32,11 +34,15 @@ pub fn sync_project(
         mut scene,
         mut satellite,
         mut assets,
+        mut picker,
+        mut demo,
     } = map;
     if std::mem::take(&mut io.reset_scene) {
+        demo.clear(&mut commands, &mut assets.meshes, &mut assets.materials);
         import.cancel();
         satellite.cancel();
         active.clear();
+        picker.selection.clear();
         if let Some(s) = scene.satellite.take() {
             assets.images.remove(s.image.id());
         }
@@ -58,6 +64,11 @@ pub fn sync_project(
         let _ = document.dispatch(Command::NewDocument);
         if let Some(region) = project.document.map_region {
             let _ = active.confirm(region);
+            picker.view.memory.center_at(walkers::lon_lat(
+                region.bounds.center().longitude,
+                region.bounds.center().latitude,
+            ));
+            picker.view.fit_requested = true;
             if io.restore
                 && let Some(id) = &project.document.layer(LayerKind::Terrain).package_id
                 && let Ok(root) = crate::map::builder::cache::root()
