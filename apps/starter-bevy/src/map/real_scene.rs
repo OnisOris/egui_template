@@ -62,6 +62,7 @@ pub fn open_real(
     if !std::mem::take(&mut runtime.real_requested) {
         return;
     }
+    let install_started = std::time::Instant::now();
     let Some((revision, region)) = active.get() else {
         import.error = Some("Confirm a region first.".into());
         return;
@@ -162,6 +163,10 @@ pub fn open_real(
     viewport.drag = None;
     viewport.fit_geo_pending = true;
     focus_geo(&mut viewport);
+    info!(
+        "Terrain CPU asset installation: {:.3} ms (GPU upload not measured)",
+        install_started.elapsed().as_secs_f64() * 1000.0
+    );
     runtime.mode = SceneMode::Real;
     import.error = None;
 }

@@ -67,3 +67,15 @@ fn config_and_deterministic_identity() {
     );
     assert!(coverage::grid(region(), &c).is_ok());
 }
+
+#[test]
+fn reduced_sample_budget_coarsens_without_exceeding_edges() {
+    let c = Config {
+        max_samples: 16,
+        max_edge: 10,
+        step_m: 0.01,
+        ..Config::default()
+    };
+    let (w, h) = coverage::grid(region(), &c).unwrap();
+    assert!(w <= 10 && h <= 10 && w * h <= 16 && w >= 2 && h >= 2);
+}

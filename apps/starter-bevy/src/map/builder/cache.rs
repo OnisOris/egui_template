@@ -17,17 +17,28 @@ pub fn id(value: &impl serde::Serialize) -> Result<String, String> {
 }
 pub struct Staging {
     pub path: PathBuf,
+    _guard: fs::File,
 }
 impl Staging {
     pub fn new(parent: &Path) -> Result<Self, String> {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        cleanup(parent)?;
         let path = parent.join(format!(
             ".staging-{}-{}",
             std::process::id(),
             SERIAL.fetch_add(1, Ordering::Relaxed)
         ));
         fs::create_dir(&path).map_err(|e| e.to_string())?;
-        Ok(Self { path })
+        let guard = fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(path.join(".active"))
+            .map_err(|e| e.to_string())?;
+        guard.lock().map_err(|e| e.to_string())?;
+        Ok(Self {
+            path,
+            _guard: guard,
+        })
     }
     pub fn publish(&self, target: &Path) -> Result<(), String> {
         // Per-package lock held by the caller also protects replacement of corrupt entries.
@@ -81,4 +92,74 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
         .and_then(|_| f.sync_all())
         .map_err(|e| e.to_string())?;
     fs::rename(temp, path).map_err(|e| e.to_string())
+}
+
+/// Only old, unlocked staging directories are abandoned; active writers keep their lock.
+fn cleanup(parent: &Path) -> Result<(), String> {
+    for entry in fs::read_dir(parent).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        if !entry.file_name().to_string_lossy().starts_with(".staging-") {
+            continue;
+        }
+        let metadata = entry.metadata().map_err(|e| e.to_string())?;
+        if !metadata.is_dir()
+            || metadata
+                .modified()
+                .ok()
+                .and_then(|t| t.elapsed().ok())
+                .is_none_or(|age| age.as_secs() < 60)
+        {
+            continue;
+        }
+        let guard = fs::OpenOptions::new()
+            .write(true)
+            .open(entry.path().join(".active"));
+        match guard {
+            Ok(file) if file.try_lock().is_ok() => {
+                let _ = fs::remove_dir_all(entry.path());
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                let _ = fs::remove_dir_all(entry.path());
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn locks_release_and_old_staging_cleanup_preserves_active_writers() {
+        let root = tempfile::tempdir().unwrap();
+        let job = super::super::network_tests::job();
+        let lock_path = root.path().join("lock");
+        let guard = Lock::acquire(&lock_path, &job).unwrap();
+        let other = fs::OpenOptions::new().write(true).open(&lock_path).unwrap();
+        assert!(matches!(
+            other.try_lock(),
+            Err(fs::TryLockError::WouldBlock)
+        ));
+        job.cancelled.store(true, Ordering::Relaxed);
+        assert!(Lock::acquire(&lock_path, &job).is_err());
+        drop(guard);
+        other.try_lock().unwrap();
+        let active = Staging::new(root.path()).unwrap();
+        let old = std::time::SystemTime::now() - std::time::Duration::from_secs(120);
+        fs::File::open(&active.path)
+            .unwrap()
+            .set_modified(old)
+            .unwrap();
+        let abandoned = root.path().join(".staging-abandoned");
+        fs::create_dir(&abandoned).unwrap();
+        fs::File::create(abandoned.join(".active")).unwrap();
+        fs::File::open(&abandoned)
+            .unwrap()
+            .set_modified(old)
+            .unwrap();
+        let _new = Staging::new(root.path()).unwrap();
+        assert!(active.path.exists());
+        assert!(!abandoned.exists());
+    }
 }

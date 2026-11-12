@@ -91,13 +91,23 @@ pub fn build(
                 .map(|t| (z, b, t))
         })
         .ok_or("Satellite area exceeds image/tile limits; reduce region")?;
-    let id = cache::id(&(2, region, provider, z, config))?;
+    let id = cache::id(&(
+        2,
+        region,
+        provider,
+        z,
+        config.imagery_step_m,
+        config.imagery_max_edge,
+        config.imagery_max_pixels,
+        config.jpeg_quality,
+        config.max_tiles,
+    ))?;
     let package = root.join("packages").join(&id);
     let _lock = cache::Lock::acquire(&root.join("locks").join(&id), job)?;
-    if let Ok(payload) = satellite::load_satellite(&package.join("map-data"), terrain) {
-        if payload.manifest.map_data_id == id {
-            return Ok(payload);
-        }
+    if let Ok(payload) = satellite::load_satellite(&package.join("map-data"), terrain)
+        && payload.manifest.map_data_id == id
+    {
+        return Ok(payload);
     }
     let tile_cache = root.join("tiles").join(cache::id(provider)?);
     let raw = http.tiles(
@@ -160,8 +170,8 @@ pub fn build(
     stage.publish(&package)?;
     Ok(payload)
 }
-pub fn configured() -> Result<Option<ImageryProvider>, String> {
-    let Some(path) = std::env::var_os("STARTER_IMAGERY_CONFIG") else {
+pub fn configured(path: Option<std::ffi::OsString>) -> Result<Option<ImageryProvider>, String> {
+    let Some(path) = path else {
         return Ok(None);
     };
     let bytes = crate::map::source::read_limited(Path::new(&path), 1_048_576)?;

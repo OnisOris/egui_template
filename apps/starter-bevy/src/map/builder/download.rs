@@ -15,9 +15,12 @@ pub struct Download {
 }
 impl Download {
     pub fn new(parallelism: usize) -> Result<Self, String> {
+        Self::with_timeout(parallelism, Duration::from_secs(25))
+    }
+    pub(super) fn with_timeout(parallelism: usize, timeout: Duration) -> Result<Self, String> {
         Ok(Self {
             client: reqwest::blocking::Client::builder()
-                .timeout(Duration::from_secs(25))
+                .timeout(timeout)
                 .connect_timeout(Duration::from_secs(10))
                 .user_agent("starter-bevy/0.1 geographic-package-builder")
                 .build()
@@ -117,8 +120,9 @@ impl Download {
                         match value {
                             Ok(bytes) => {
                                 result.lock().unwrap().insert(t, bytes);
+                                let mut progress = job.progress.lock().unwrap();
                                 let n = done.fetch_add(1, Ordering::Relaxed) + 1;
-                                job.status(format!("{phase} · {n} / {} tiles", tiles.len()));
+                                *progress = format!("{phase} · {n} / {} tiles", tiles.len());
                             }
                             Err(e) => {
                                 *error.lock().unwrap() = Some(e);

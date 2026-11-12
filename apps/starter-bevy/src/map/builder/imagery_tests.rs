@@ -60,6 +60,7 @@ fn stitch_crop_north_up_and_uv() {
 }
 #[test]
 fn jpeg_package_roundtrip_cache_and_permissions() {
+    assert!(imagery::configured(None).unwrap().is_none());
     let mut bytes = std::io::Cursor::new(Vec::new());
     image::RgbImage::from_pixel(256, 256, image::Rgb([30, 120, 60]))
         .write_to(&mut bytes, image::ImageFormat::Jpeg)
@@ -103,5 +104,30 @@ fn jpeg_package_roundtrip_cache_and_permissions() {
         provider::ImageryProvider { max_zoom: 30, ..p }
             .validate()
             .is_err()
+    );
+}
+
+#[test]
+fn imagery_failure_preserves_successful_dem() {
+    let server = network_tests::Server::new(b"corrupt jpeg".to_vec());
+    let p = provider(format!("{}/{{z}}/{{x}}/{{y}}.jpg", server.url));
+    let dir = crate::map::dem_tests::package(3, 3);
+    let terrain = source::load_terrain(dir.path()).unwrap();
+    let fingerprint = terrain.fingerprint;
+    let root = tempfile::tempdir().unwrap();
+    assert!(
+        imagery::build(
+            &terrain,
+            &p,
+            &Config::default(),
+            root.path(),
+            &download::Download::new(2).unwrap(),
+            &network_tests::job()
+        )
+        .is_err()
+    );
+    assert_eq!(
+        source::load_terrain(dir.path()).unwrap().fingerprint,
+        fingerprint
     );
 }

@@ -1,4 +1,3 @@
-
 use super::*;
 #[test]
 fn late_results_and_same_region_new_request_cannot_replace_scene() {

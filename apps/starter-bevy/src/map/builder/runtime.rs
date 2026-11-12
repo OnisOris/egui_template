@@ -28,7 +28,7 @@ struct Pending {
     shutdown: bool,
 }
 enum Output {
-    Terrain(PreparedTerrain),
+    Terrain(Box<PreparedTerrain>),
     Satellite(Box<crate::map::satellite::SatellitePayload>, blake3::Hash),
     Done(String),
 }
@@ -108,7 +108,7 @@ impl Worker {
     fn new() -> Self {
         let pending = Arc::new((Mutex::new(Pending::default()), Condvar::new()));
         let queue = pending.clone();
-        let (send, results) = mpsc::channel();
+        let (send, results) = mpsc::sync_channel(2);
         std::thread::Builder::new()
             .name("map-package-builder".into())
             .spawn(move || {
@@ -126,6 +126,7 @@ impl Worker {
                         pending.request.take().unwrap()
                     };
                     let Request { key, job } = request;
+                    let started = std::time::Instant::now();
                     let result = (|| {
                         let config =
                             if let Some(path) = std::env::var_os("STARTER_MAP_BUILDER_CONFIG") {
@@ -156,23 +157,35 @@ impl Worker {
                     match result {
                         Ok((prepared, config, root)) => {
                             let data = prepared.data.clone();
-                            if send.send((key, Ok(Output::Terrain(prepared)))).is_err() {
+                            info!(
+                                "Map terrain {}: {}x{}, ready in {:.3}s",
+                                data.manifest.terrain_id,
+                                data.manifest.width,
+                                data.manifest.height,
+                                started.elapsed().as_secs_f64()
+                            );
+                            if send
+                                .send((key, Ok(Output::Terrain(Box::new(prepared)))))
+                                .is_err()
+                            {
                                 break;
                             }
-                            let satellite = imagery::configured().and_then(|provider| {
-                                provider
-                                    .map(|p| {
-                                        imagery::build(
-                                            &data,
-                                            &p,
-                                            &config,
-                                            &root,
-                                            http.as_ref().map_err(Clone::clone)?,
-                                            &job,
-                                        )
-                                    })
-                                    .transpose()
-                            });
+                            let satellite =
+                                imagery::configured(std::env::var_os("STARTER_IMAGERY_CONFIG"))
+                                    .and_then(|provider| {
+                                        provider
+                                            .map(|p| {
+                                                imagery::build(
+                                                    &data,
+                                                    &p,
+                                                    &config,
+                                                    &root,
+                                                    http.as_ref().map_err(Clone::clone)?,
+                                                    &job,
+                                                )
+                                            })
+                                            .transpose()
+                                    });
                             let output = match satellite {
                                 Ok(Some(payload)) => {
                                     Output::Satellite(Box::new(payload), data.fingerprint)
@@ -221,7 +234,7 @@ pub fn poll_builder(
     if let Some(result) = import.builder.poll(&active) {
         match result {
             Ok(Output::Terrain(prepared)) => {
-                import.prepared = Some(prepared);
+                import.prepared = Some(*prepared);
                 import.error = None;
                 runtime.real_requested = true;
             }

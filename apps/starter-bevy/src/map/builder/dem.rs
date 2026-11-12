@@ -37,8 +37,8 @@ pub fn decode(bytes: &[u8], size: u32, terrain: bool) -> Result<image::RgbImage,
     {
         return Err("Invalid geographic tile dimensions/channels".into());
     }
-    if terrain && decoded.color().has_alpha() && decoded.to_rgba8().pixels().any(|p| p[3] != 255) {
-        return Err("DEM tile contains missing/transparent samples".into());
+    if decoded.color().has_alpha() && decoded.to_rgba8().pixels().any(|p| p[3] != 255) {
+        return Err("Geographic tile contains missing/transparent samples".into());
     }
     Ok(decoded.into_rgb8())
 }
@@ -82,6 +82,8 @@ pub fn build(
     http: &Download,
     job: &Job,
 ) -> Result<Arc<TerrainPayload>, String> {
+    config.validate()?;
+    MapRegion::new(region.bounds, region.origin).map_err(String::from)?;
     let metadata = root
         .join("metadata")
         .join(cache::id(&config.terrain_tilejson)?);
@@ -126,17 +128,45 @@ pub fn build(
         &provider.attribution,
     ))?;
     let tile_cache = root.join("tiles").join(namespace);
+    let candidates = (provider.minzoom..=desired)
+        .rev()
+        .map(|z| {
+            let id = cache::id(&(
+                1,
+                region,
+                config.step_m,
+                config.max_edge,
+                config.max_samples,
+                config.max_tiles,
+                &config.terrain_tilejson,
+                z,
+                &provider.tiles,
+                &provider.attribution,
+            ))?;
+            Ok((z, id))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    // Search every viable cached zoom before attempting any network requests.
+    for (_, id) in &candidates {
+        let _lock = cache::Lock::acquire(&root.join("locks").join(id), job)?;
+        if let Ok(data) = source::load_terrain(&root.join("packages").join(id).join("terrain"))
+            && data.manifest.matches(region)
+            && data.manifest.terrain_id == *id
+        {
+            return Ok(Arc::new(data));
+        }
+    }
     let mut last = "No DEM coverage; reduce region".to_owned();
-    for z in (provider.minzoom..=desired).rev() {
+    for (z, id) in candidates {
         job.check()?;
-        let id = cache::id(&(1, region, config, z, &provider.tiles, &provider.attribution))?;
         let package = root.join("packages").join(&id);
         let _lock = cache::Lock::acquire(&root.join("locks").join(&id), job)?;
         job.status("Checking cache".into());
-        if let Ok(data) = source::load_terrain(&package.join("terrain")) {
-            if data.manifest.matches(region) && data.manifest.terrain_id == id {
-                return Ok(Arc::new(data));
-            }
+        if let Ok(data) = source::load_terrain(&package.join("terrain"))
+            && data.manifest.matches(region)
+            && data.manifest.terrain_id == id
+        {
+            return Ok(Arc::new(data));
         }
         let required = match coverage::tiles(
             &coverage::bounds(region, z, 512),

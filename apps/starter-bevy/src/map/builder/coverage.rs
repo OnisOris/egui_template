@@ -15,7 +15,11 @@ pub struct Tile {
 pub fn pixel(lon: f64, lat: f64, z: u8, size: u32) -> [f64; 2] {
     let p = walkers::mercator::project(walkers::Position::new(lon, lat), f64::from(z));
     let scale = f64::from(size) / 256.0;
-    [p.x() * scale, p.y() * scale]
+    let world = f64::from(size) * 2f64.powi(i32::from(z));
+    [
+        (p.x() * scale).clamp(0.0, world),
+        (p.y() * scale).clamp(0.0, world),
+    ]
 }
 pub fn bounds(region: MapRegion, z: u8, size: u32) -> PixelBounds {
     let b = region.bounds;
@@ -72,14 +76,17 @@ pub fn grid(region: MapRegion, config: &Config) -> Result<(u32, u32), String> {
     if nw.into_iter().chain(se).any(|v| v.abs() > 1_000_000.0) {
         return Err("Region/origin exceeds local coordinate limits; reduce the region".into());
     }
-    let step = config
+    let mut step = config
         .step_m
         .max((se[0] - nw[0]) / f64::from(config.max_edge - 1))
         .max((se[1] - nw[1]) / f64::from(config.max_edge - 1));
-    let w = (((se[0] - nw[0]) / step).ceil() as u32 + 1).max(2);
-    let h = (((se[1] - nw[1]) / step).ceil() as u32 + 1).max(2);
-    if u64::from(w) * u64::from(h) > config.max_samples as u64 {
-        return Err("DEM sample limit exceeded; reduce the region".into());
+    loop {
+        let w = (((se[0] - nw[0]) / step).ceil() as u32 + 1).clamp(2, config.max_edge);
+        let h = (((se[1] - nw[1]) / step).ceil() as u32 + 1).clamp(2, config.max_edge);
+        let count = u64::from(w) * u64::from(h);
+        if count <= config.max_samples as u64 {
+            return Ok((w, h));
+        }
+        step *= ((count as f64 / config.max_samples as f64).sqrt()).max(1.01);
     }
-    Ok((w, h))
 }
