@@ -28,7 +28,7 @@ pub fn draw(
         && let Some(VertexAttributeValues::Float32x3(positions)) =
             mesh.attribute(Mesh::ATTRIBUTE_POSITION)
     {
-        for pair in positions.chunks_exact(2) {
+        for pair in positions.as_chunks::<2>().0 {
             gizmos.line(
                 Vec3::from_array(pair[0]),
                 Vec3::from_array(pair[1]),
