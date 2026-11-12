@@ -61,6 +61,11 @@ impl MapManifest {
         let b = &g.crop_pixel_bounds;
         if self.format_version != 2
             || self.map_data_id.is_empty()
+            || self.map_data_id.len() > 256
+            || !self
+                .map_data_id
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
             || s.file != "satellite.jpg"
             || s.media_type != "image/jpeg"
             || s.provider.trim().is_empty()

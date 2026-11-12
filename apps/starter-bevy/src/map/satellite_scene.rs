@@ -43,12 +43,10 @@ impl SatelliteImport {
         scene: &RealScene,
         directory: Option<PathBuf>,
     ) {
-        let data = scene.data.clone();
-        if data.is_some() && scene.revision != active.get().map(|(r, _)| r) {
-            self.error =
-                Some("Open the confirmed region's DEM before importing satellite imagery.".into());
-            return;
-        }
+        let data = scene
+            .data
+            .clone()
+            .filter(|_| scene.revision == active.get().map(|(r, _)| r));
         self.revision = active.get().map(|(r, _)| r);
         self.terrain = data.as_ref().map(|d| d.fingerprint);
         self.pending = None;
@@ -60,7 +58,29 @@ impl SatelliteImport {
                     .pick_folder()
             });
             path.map(|p| {
-                let mut payload = satellite::read_package(&p, None)?;
+                let mut path = p.clone();
+                let mut expected = None;
+                if !p.exists() {
+                    let settings = super::sources::load_saved()?;
+                    let packages = settings
+                        .package_directory
+                        .map(PathBuf::from)
+                        .unwrap_or_else(super::package_browser::default_directory);
+                    if let Some((candidate, id)) = super::package_browser::external_package(
+                        &p,
+                        &super::builder::cache::root()?,
+                        &packages,
+                    ) {
+                        path = candidate;
+                        expected = Some(id);
+                    }
+                }
+                let mut payload = satellite::read_package(&path, None)?;
+                if expected.is_some_and(|id| id != payload.manifest.map_data_id) {
+                    return Err(
+                        "Existing package ID differs from the saved project reference".into(),
+                    );
+                }
                 if let Some(data) = &data
                     && payload.manifest.validate(Some(data)).is_ok()
                 {
@@ -128,6 +148,8 @@ pub fn poll_satellite(
                 }
                 if let Err(error) = install(&mut scene, &mut assets, payload) {
                     import.error = Some(error);
+                } else {
+                    import.packages.open = false;
                 }
             }
             Ok(None) => {}

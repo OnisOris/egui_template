@@ -100,3 +100,6 @@ mod package_tests;
 
 #[cfg(test)]
 mod preview_tests;
+
+#[cfg(test)]
+mod satellite_import_tests;

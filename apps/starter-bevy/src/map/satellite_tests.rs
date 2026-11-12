@@ -9,7 +9,7 @@ use super::{
 use bevy::{ecs::schedule::Schedule, mesh::VertexAttributeValues, prelude::*};
 use std::{fs, path::Path};
 
-fn package(terrain: &source::TerrainPayload) -> tempfile::TempDir {
+pub(super) fn package(terrain: &source::TerrainPayload) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let m = &terrain.manifest;
     let zoom = 14;
@@ -103,6 +103,7 @@ fn rejects_wrong_version_territory_crop_dimensions_and_corrupt_jpeg() {
     let original: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
     for (pointer, value) in [
         ("/formatVersion", serde_json::json!(1)),
+        ("/mapDataId", serde_json::json!("../unsafe-id")),
         ("/origin/latitude", serde_json::json!(42.01)),
         ("/satellite/width", serde_json::json!(8193)),
         ("/satellite/height", serde_json::json!(1)),

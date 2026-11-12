@@ -61,7 +61,6 @@ pub fn viewport_bar(
                 ui.selectable_value(&mut scene.satellite_enabled, true, "Satellite");
             });
             if ui.small_button("Import Existing Package…").clicked() {
-                import.builder.cancel();
                 satellite.packages.open = true;
             }
         }
@@ -108,10 +107,21 @@ pub fn viewport_bar(
             );
         }
     }
+    if runtime.mode == SceneMode::Real
+        && scene.satellite.is_none()
+        && satellite.pending.is_none()
+        && satellite.error.is_none()
+        && !satellite.loading()
+        && !import.builder.loading
+    {
+        ui.small("DEM Ready · Satellite source not configured");
+    }
     if satellite.loading() {
         ui.label("Loading satellite JPEG… UI remains available.");
     }
-    if let Some(error) = &satellite.error {
+    if let Some(error) = &satellite.error
+        && !(satellite.packages.open && satellite.pending.is_some())
+    {
         ui.colored_label(
             ui.visuals().error_fg_color,
             format!("Satellite error · {error}"),

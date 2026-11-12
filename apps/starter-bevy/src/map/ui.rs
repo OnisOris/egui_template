@@ -27,6 +27,11 @@ pub fn show(
         picker.imagery.controls(ui);
         ui.menu_button("Satellite Packages", |ui| {
             if ui.button("Import Existing Package…").clicked() {
+                if scene.data.is_some()
+                    && scene.revision == active.get().map(|(revision, _)| revision)
+                {
+                    import.builder.cancel();
+                }
                 satellite.start(active, scene, None);
                 ui.close();
             }

@@ -10,6 +10,7 @@ pub struct ImageryView {
     pub(super) task: Option<Task<Result<super::sources::MapSources, String>>>,
     pub settings: Option<super::sources::MapSources>,
     pub settings_open: bool,
+    pub package_directory_update: Option<String>,
 }
 impl ImageryView {
     pub fn retry(&mut self) {
@@ -35,6 +36,7 @@ impl ImageryView {
                         .provider
                         .clone()
                         .filter(|_| settings.online_authorized);
+                    self.package_directory_update = settings.package_directory.clone();
                     self.settings = Some(settings);
                     match provider {
                         Some(provider) => match ImageryTiles::new(provider, ctx.clone()) {

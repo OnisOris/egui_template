@@ -42,10 +42,15 @@ pub fn scan(root: &Path) -> Result<Vec<(PathBuf, MapManifest)>, String> {
     entries.sort_by(|a, b| a.1.map_data_id.cmp(&b.1.map_data_id));
     Ok(entries)
 }
-pub fn area(ui: &mut Ui, label: &str, m: &MapManifest) {
+pub fn area(
+    ui: &mut Ui,
+    label: &str,
+    bounds: super::region::GeoBounds,
+    origin: super::region::GeoOrigin,
+) {
     ui.label(format!(
         "{label}: W {:.6} S {:.6} E {:.6} N {:.6}; origin {:.7}, {:.7}",
-        m.bbox.west, m.bbox.south, m.bbox.east, m.bbox.north, m.origin.longitude, m.origin.latitude
+        bounds.west, bounds.south, bounds.east, bounds.north, origin.longitude, origin.latitude
     ));
 }
 pub fn show(
@@ -81,11 +86,13 @@ pub fn show(
         if let Some(error) = &browser.error {ui.colored_label(ui.visuals().error_fg_color,error);}
         if let Some(payload) = &import.pending {
             ui.separator();
-            ui.strong("Satellite package does not match the current terrain region");
-            area(ui, "Package", &payload.manifest);
+            ui.strong(if scene.data.is_some() {"Satellite package does not match the current terrain region"} else {"Satellite package is waiting for DEM"});
+            area(ui, "Package", payload.manifest.bbox, payload.manifest.origin);
+            let s = &payload.manifest.satellite;
+            ui.label(format!("{} × {} · z{} · {}",s.width,s.height,s.zoom,s.provider));
             if let Some(data) = &scene.data {
                 let m = &data.manifest;
-                ui.label(format!("DEM: {:?}; origin {:?}",m.bbox,m.origin));
+                area(ui,"DEM",m.bbox,m.origin);
             } else {ui.label("No DEM loaded. The package is waiting for a compatible surface.");}
             ui.label("Load a DEM with matching bbox AND origin, or explicitly adopt this package's region and load DEM.");
             if ui.button("Use Package Region (including origin)").clicked() {
@@ -96,7 +103,7 @@ pub fn show(
         for (path, manifest) in &browser.entries {
             let s = &manifest.satellite;
             ui.strong(&manifest.map_data_id);
-            area(ui,"Area",manifest);
+            area(ui,"Area",manifest.bbox,manifest.origin);
             ui.label(format!("{} × {} · z{} · {}",s.width,s.height,s.zoom,s.provider));
             ui.label(if let Some(data) = &scene.data {if manifest.validate(Some(data)).is_ok() {"Compatible with DEM"} else {"Different bbox/origin"}} else {"DEM not loaded"});
             if ui.add_enabled(!loading,egui::Button::new("Open Package")).clicked() {selected = Some(Some(path.clone()));}
@@ -113,4 +120,26 @@ pub fn show(
     if let Some(path) = selected {
         import.start(active, scene, path);
     }
+}
+
+/// Resolve only the application's missing cached map-data reference, never arbitrary paths.
+pub(super) fn external_package(
+    directory: &Path,
+    cache: &Path,
+    packages: &Path,
+) -> Option<(PathBuf, String)> {
+    let relative = directory.strip_prefix(cache.join("packages")).ok()?;
+    let mut parts = relative.components();
+    let id = parts.next()?.as_os_str().to_str()?;
+    if id.is_empty()
+        || id.len() > 256
+        || !id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        || parts.next()?.as_os_str() != "map-data"
+        || parts.next().is_some()
+    {
+        return None;
+    }
+    Some((packages.join(id), id.to_owned()))
 }

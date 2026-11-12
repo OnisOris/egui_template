@@ -172,12 +172,16 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
         viewport.drag = None;
     }
     crate::map::source_settings::show(ui, &mut picker.imagery);
-    if satellite.packages.directory.is_empty()
-        && let Some(settings) = &picker.imagery.settings
-    {
-        satellite.packages.directory = settings.package_directory.clone().unwrap_or_default();
+    if let Some(directory) = picker.imagery.package_directory_update.take() {
+        satellite.packages.directory = directory;
     }
     crate::map::package_browser::show(ui, satellite, active, real);
+    if satellite.loading()
+        && real.data.is_some()
+        && real.revision == active.get().map(|(revision, _)| revision)
+    {
+        import.builder.cancel();
+    }
     if !map_visible {
         picker.selection.drag_start = None;
     }

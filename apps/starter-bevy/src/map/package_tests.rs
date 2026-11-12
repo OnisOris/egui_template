@@ -34,3 +34,28 @@ fn actual_uav_v2_manifest_ignores_vectors_and_uses_the_existing_decoder() {
     std::fs::write(dir.join("satellite.jpg"), b"broken").unwrap();
     assert!(package_browser::scan(root.path()).unwrap().is_empty());
 }
+
+#[test]
+fn missing_owned_cache_reference_resolves_only_inside_the_selected_package_catalog() {
+    let cache = std::path::Path::new("/owned/geo");
+    let packages = std::path::Path::new("/external/packages");
+    let (path, id) = package_browser::external_package(
+        std::path::Path::new("/owned/geo/packages/map-data-123/map-data"),
+        cache,
+        packages,
+    )
+    .unwrap();
+    assert_eq!(path, packages.join("map-data-123"));
+    assert_eq!(id, "map-data-123");
+    for path in [
+        "/somewhere/map-data-123/map-data",
+        "/owned/geo/packages/id/terrain",
+        "/owned/geo/packages/id/map-data/extra",
+        "/owned/geo/packages/../map-data",
+    ] {
+        assert!(
+            package_browser::external_package(std::path::Path::new(path), cache, packages)
+                .is_none()
+        );
+    }
+}
