@@ -157,6 +157,10 @@ pub(crate) fn editor_ui(
         dispatch(&mut document, &mut ui_state.notice, command);
     }
     for action in actions {
+        if matches!(action, EditorAction::MapSources) {
+            picker.imagery.settings_open = true;
+            continue;
+        }
         apply(
             action,
             &mut ui_state,
@@ -221,6 +225,7 @@ fn apply(
             };
             io.request(action, project);
         }
+        EditorAction::MapSources => {}
         EditorAction::ExitDemo => {
             io.benchmark = false;
             dispatch(document, &mut ui_state.notice, Command::NewDocument);

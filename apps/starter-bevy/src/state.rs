@@ -91,6 +91,7 @@ pub enum EditorAction {
     ResetLayout,
     ToggleProjection,
     ToggleTheme,
+    MapSources,
     SetLoad(usize),
 }
 

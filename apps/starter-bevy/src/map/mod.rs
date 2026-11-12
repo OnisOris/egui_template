@@ -17,6 +17,8 @@ pub mod satellite;
 pub mod satellite_scene;
 pub mod selection;
 pub mod source;
+pub mod source_settings;
+pub mod sources;
 mod terrain;
 mod tiles;
 pub mod ui;
@@ -95,3 +97,6 @@ mod model_placement_tests;
 
 #[cfg(test)]
 mod package_tests;
+
+#[cfg(test)]
+mod preview_tests;

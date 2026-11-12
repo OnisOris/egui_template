@@ -42,7 +42,7 @@ impl Download {
                     if status == reqwest::StatusCode::NOT_FOUND
                         || status == reqwest::StatusCode::NO_CONTENT
                     {
-                        return Err("Missing geographic tile coverage".into());
+                        return Err(format!("Missing geographic tile coverage (HTTP {status})"));
                     }
                     if status.is_success() {
                         let mut bytes = Vec::new();
@@ -89,6 +89,33 @@ impl Download {
         job: &Job,
         phase: &str,
     ) -> Result<BTreeMap<Tile, Vec<u8>>, String> {
+        self.fetch_tiles(template, token, tiles, Some(cache), job, phase)
+    }
+    pub fn tiles_memory(
+        &self,
+        template: &str,
+        token: Option<&str>,
+        tiles: &[Tile],
+        job: &Job,
+    ) -> Result<BTreeMap<Tile, Vec<u8>>, String> {
+        self.fetch_tiles(
+            template,
+            token,
+            tiles,
+            None,
+            job,
+            "Downloading satellite map",
+        )
+    }
+    fn fetch_tiles(
+        &self,
+        template: &str,
+        token: Option<&str>,
+        tiles: &[Tile],
+        cache: Option<&std::path::Path>,
+        job: &Job,
+        phase: &str,
+    ) -> Result<BTreeMap<Tile, Vec<u8>>, String> {
         let next = AtomicUsize::new(0);
         let done = AtomicUsize::new(0);
         let result = Mutex::new(BTreeMap::new());
@@ -102,19 +129,22 @@ impl Download {
                             break;
                         }
                         let t = tiles[i];
-                        let path = cache.join(format!("{}/{}/{}.tile", t.z, t.x, t.y));
+                        let path = cache.map(|c| c.join(format!("{}/{}/{}.tile", t.z, t.x, t.y)));
                         let url = template
                             .replace("{z}", &t.z.to_string())
                             .replace("{x}", &t.x.to_string())
                             .replace("{y}", &t.y.to_string());
                         let value = job.check().and_then(|_| {
-                            if let Ok(bytes) =
-                                crate::map::source::read_limited(&path, 8 * 1024 * 1024)
+                            if let Some(path) = &path
+                                && let Ok(bytes) =
+                                    crate::map::source::read_limited(path, 8 * 1024 * 1024)
                             {
                                 return Ok(bytes);
                             }
                             let bytes = self.get(&url, token, job)?;
-                            super::cache::write_atomic(&path, &bytes)?;
+                            if let Some(path) = &path {
+                                super::cache::write_atomic(path, &bytes)?;
+                            }
                             Ok(bytes)
                         });
                         match value {

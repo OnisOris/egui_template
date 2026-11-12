@@ -24,6 +24,7 @@ pub struct ImageryTiles {
     pub provider: ImageryProvider,
     pub error: Option<String>,
     capacity: usize,
+    failed: HashMap<TileId, std::time::Instant>,
 }
 impl ImageryTiles {
     pub fn new(provider: ImageryProvider, ctx: Context) -> Result<Self, String> {
@@ -31,7 +32,10 @@ impl ImageryTiles {
             .bearer_env
             .as_ref()
             .and_then(|name| std::env::var(name).ok());
-        provider.validate()?;
+        provider.validate_preview()?;
+        if provider.bearer_env.is_some() && token.is_none() {
+            return Err("Satellite authorization variable is missing".into());
+        }
         Ok(Self::with_token(provider, ctx, token, cache::root()?))
     }
     pub(super) fn with_token(
@@ -52,7 +56,7 @@ impl ImageryTiles {
             .name("walkers-satellite".into())
             .spawn(move || {
                 let setup = (|| {
-                    source.validate()?;
+                    source.validate_preview()?;
                     if source.bearer_env.is_some() && token.is_none() {
                         return Err("Satellite authorization variable is missing".into());
                     }
@@ -82,6 +86,14 @@ impl ImageryTiles {
                                         y: t.y,
                                     })
                                     .collect();
+                                if !source.allow_permanent_packages {
+                                    return http.tiles_memory(
+                                        &source.url,
+                                        token.as_deref(),
+                                        &tiles,
+                                        &work,
+                                    );
+                                }
                                 http.tiles(
                                     &source.url,
                                     token.as_deref(),
@@ -102,7 +114,9 @@ impl ImageryTiles {
                                 .ok_or("Missing satellite tile")?;
                             let image =
                                 decode(bytes, source.tile_size, false).inspect_err(|_| {
-                                    if let Ok((_, root, _)) = &setup {
+                                    if source.allow_permanent_packages
+                                        && let Ok((_, root, _)) = &setup
+                                    {
                                         let _ =
                                             std::fs::remove_file(root.join(format!(
                                                 "{}/{}/{}.tile",
@@ -142,6 +156,7 @@ impl ImageryTiles {
             provider,
             error: None,
             capacity,
+            failed: HashMap::new(),
         }
     }
     pub fn poll(&mut self) {
@@ -149,6 +164,8 @@ impl ImageryTiles {
             self.pending.remove(&id);
             match result {
                 Ok(texture) => {
+                    self.failed.remove(&id);
+                    self.error = None;
                     if self.textures.len() >= self.capacity
                         && let Some(old) = self.order.pop_front()
                     {
@@ -157,9 +174,18 @@ impl ImageryTiles {
                     self.textures.insert(id, texture);
                     self.order.push_back(id);
                 }
-                Err(e) => self.error = Some(e),
+                Err(e) => {
+                    self.error = Some(e);
+                    if self.failed.len() >= self.capacity {
+                        self.failed.clear();
+                    }
+                    self.failed.insert(id, std::time::Instant::now());
+                }
             }
         }
+    }
+    pub fn ready(&self) -> bool {
+        !self.textures.is_empty()
     }
     pub fn zoom_limits(&self) -> (f64, f64) {
         let offset = (f64::from(self.provider.tile_size) / 256.0).log2();
@@ -184,8 +210,14 @@ impl Tiles for ImageryTiles {
                 Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
             ));
         }
-        if self.error.is_none() && !self.pending.contains(&id) && self.requests.try_send(id).is_ok()
+        if self
+            .failed
+            .get(&id)
+            .is_some_and(|at| at.elapsed() < std::time::Duration::from_secs(5))
         {
+            return None;
+        }
+        if !self.pending.contains(&id) && self.requests.try_send(id).is_ok() {
             self.pending.insert(id);
         }
         None

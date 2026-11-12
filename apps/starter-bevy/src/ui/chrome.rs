@@ -114,6 +114,10 @@ fn menu(
                 }
             });
             ui.menu_button("Settings", |ui| {
+                if ui.button("Map Sources…").clicked() {
+                    actions.push(EditorAction::MapSources);
+                    ui.close();
+                }
                 if ui.button("Toggle theme").clicked() {
                     actions.push(EditorAction::ToggleTheme);
                     ui.close();

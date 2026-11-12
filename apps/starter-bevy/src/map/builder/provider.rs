@@ -15,10 +15,13 @@ pub struct ImageryProvider {
 }
 impl ImageryProvider {
     pub fn validate(&self) -> Result<(), String> {
-        let url = reqwest::Url::parse(&self.url).map_err(|_| "Invalid imagery URL")?;
         if !self.allow_permanent_packages {
             return Err("Satellite source does not permit permanent packages".into());
         }
+        self.validate_preview()
+    }
+    pub fn validate_preview(&self) -> Result<(), String> {
+        let url = reqwest::Url::parse(&self.url).map_err(|_| "Invalid imagery URL")?;
         if (url.scheme() != "https"
             && !(url.scheme() == "http" && url.host_str() == Some("127.0.0.1")))
             || url.host_str() == Some("tile.openstreetmap.org")

@@ -68,6 +68,7 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
     let mut open = false;
     let mut map_visible = false;
     let mut viewport_visible = false;
+    picker.imagery.poll(ui.ctx());
     let placing_before = project.placing_model.clone();
     workspace.show(ui, |panel_ui, pane| match pane {
         PanelId::Map => {
@@ -169,6 +170,12 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
     });
     if !viewport_visible {
         viewport.drag = None;
+    }
+    crate::map::source_settings::show(ui, &mut picker.imagery);
+    if satellite.packages.directory.is_empty()
+        && let Some(settings) = &picker.imagery.settings
+    {
+        satellite.packages.directory = settings.package_directory.clone().unwrap_or_default();
     }
     crate::map::package_browser::show(ui, satellite, active, real);
     if !map_visible {

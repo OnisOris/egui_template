@@ -47,3 +47,29 @@ Esri export is not enabled automatically. See official guidance:
 Online 3D tile mosaics are not enabled for Esri without confirmed permission for
 that mode. The supported 3D paths are existing authorized packages and an explicitly
 licensed ImageryProvider. Public tile availability does not grant export rights.
+
+## Online Preview settings
+
+Settings → Map Sources offers an Esri World Imagery preset, explicit online-access
+confirmation, optional bearer-token environment variable name and package directory.
+Apply and Save writes application `map-sources.json` beside layout.json, never into
+project JSON. No token value is persisted. Existing STARTER_IMAGERY_CONFIG remains
+supported and overrides the saved source on restart; both Walkers and the licensed
+builder use the same provider configuration. Disabling authorization disables use.
+
+Esri preset: 256 px XYZ, z0–19, URL `/tile/{z}/{y}/{x}`. Coordinate x remains eastward
+and y southward. Preview validates URL/dimensions independently of export permission.
+The preset always sets allow_permanent_packages=false. The automatic imagery builder
+skips preview-only sources; it continues preparing DEM without satellite export.
+
+ImageryTiles still implements Walkers Tiles, reusing the existing authorized HTTP
+loader (4 simultaneous requests, bounded queue/replies, 25 s timeout, at most three
+attempts). Preview explicitly bypasses persistent tile reads AND writes. Only the
+bounded texture LRU (at most 64 MiB / 128 textures) retains visible-map tiles. No
+area prefetch, package assembly or 3D mosaic occurs in Preview. Dropping the adapter
+cancels its job and releases texture handles. Licensed providers retain their existing
+persistent-cache/package path. Failed tiles have a five-second retry cooldown;
+Retry tiles / Reload source also recover. HTTP status diagnostics remain visible.
+
+The user explicitly confirmed online-preview rights without a token in this session.
+That confirmation does not authorize Esri package export or a temporary 3D mosaic.

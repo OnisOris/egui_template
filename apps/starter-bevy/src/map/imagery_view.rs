@@ -1,7 +1,4 @@
-use super::{
-    builder::{imagery, provider::ImageryProvider},
-    imagery_tiles::ImageryTiles,
-};
+use super::imagery_tiles::ImageryTiles;
 use bevy::tasks::{AsyncComputeTaskPool, Task, futures_lite::future};
 use bevy_egui::egui::{self, Ui};
 #[derive(Default)]
@@ -10,7 +7,9 @@ pub struct ImageryView {
     pub tiles: Option<ImageryTiles>,
     pub message: Option<String>,
     attempted: bool,
-    task: Option<Task<Result<Option<ImageryProvider>, String>>>,
+    pub(super) task: Option<Task<Result<super::sources::MapSources, String>>>,
+    pub settings: Option<super::sources::MapSources>,
+    pub settings_open: bool,
 }
 impl ImageryView {
     pub fn retry(&mut self) {
@@ -19,19 +18,10 @@ impl ImageryView {
         self.task = None;
         self.message = None;
     }
-    pub fn controls(&mut self, ui: &mut Ui) {
+    pub fn poll(&mut self, ctx: &egui::Context) {
         if !self.attempted {
             self.attempted = true;
-            self.task = Some(AsyncComputeTaskPool::get().spawn(async {
-                let provider = imagery::configured(std::env::var_os("STARTER_IMAGERY_CONFIG"))?;
-                if let Some(p) = &provider
-                    && let Some(name) = &p.bearer_env
-                {
-                    std::env::var(name)
-                        .map_err(|_| "Satellite authorization variable is missing")?;
-                }
-                Ok(provider)
-            }));
+            self.task = Some(AsyncComputeTaskPool::get().spawn(async { super::sources::load() }));
         }
         if let Some(result) = self
             .task
@@ -40,22 +30,40 @@ impl ImageryView {
         {
             self.task = None;
             match result {
-                Ok(Some(provider)) => match ImageryTiles::new(provider, ui.ctx().clone()) {
-                    Ok(tiles) => {
-                        self.tiles = Some(tiles);
-                        self.message = None;
+                Ok(settings) => {
+                    let provider = settings
+                        .provider
+                        .clone()
+                        .filter(|_| settings.online_authorized);
+                    self.settings = Some(settings);
+                    match provider {
+                        Some(provider) => match ImageryTiles::new(provider, ctx.clone()) {
+                            Ok(tiles) => {
+                                self.tiles = Some(tiles);
+                                self.message = None;
+                            }
+                            Err(e) => self.message = Some(e),
+                        },
+                        None => {
+                            self.message = Some(
+                                "Satellite source not configured or online access not authorized"
+                                    .into(),
+                            )
+                        }
                     }
-                    Err(e) => self.message = Some(e),
-                },
-                Ok(None) => self.message = Some("Satellite source not configured".into()),
+                }
                 Err(e) => self.message = Some(e),
             }
         }
         if let Some(tiles) = &mut self.tiles {
             tiles.poll();
         }
+    }
+    pub fn controls(&mut self, ui: &mut Ui) {
+        self.poll(ui.ctx());
         ui.horizontal_wrapped(|ui| {
-            ui.selectable_value(&mut self.enabled, false, "Standard");
+            ui.label("Map style");
+            ui.selectable_value(&mut self.enabled, false, "Standard (OSM)");
             ui.add_enabled_ui(self.tiles.is_some(), |ui| {
                 ui.selectable_value(&mut self.enabled, true, "Satellite");
             });
@@ -65,6 +73,9 @@ impl ImageryView {
                         .as_deref()
                         .unwrap_or("Checking satellite source…"),
                 );
+            }
+            if ui.small_button("Map Sources…").clicked() {
+                self.settings_open = true;
             }
             if ui.small_button("Reload source").clicked() {
                 self.tiles = None;

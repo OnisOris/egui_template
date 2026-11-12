@@ -171,12 +171,22 @@ pub fn build(
     Ok(payload)
 }
 pub fn configured(path: Option<std::ffi::OsString>) -> Result<Option<ImageryProvider>, String> {
-    let Some(path) = path else {
-        return Ok(None);
+    let provider = if let Some(path) = path {
+        let bytes = crate::map::source::read_limited(Path::new(&path), 1_048_576)?;
+        Some(
+            serde_json::from_slice::<ImageryProvider>(&bytes)
+                .map_err(|_| "Invalid satellite configuration")?,
+        )
+    } else {
+        let settings = crate::map::sources::load_saved()?;
+        settings.provider.filter(|_| settings.online_authorized)
     };
-    let bytes = crate::map::source::read_limited(Path::new(&path), 1_048_576)?;
-    let provider: ImageryProvider =
-        serde_json::from_slice(&bytes).map_err(|_| "Invalid satellite configuration")?;
-    provider.validate()?;
-    Ok(Some(provider))
+    if let Some(provider) = &provider {
+        provider.validate_preview()?;
+    }
+    let provider = provider.filter(|p| p.allow_permanent_packages);
+    if let Some(provider) = &provider {
+        provider.validate()?;
+    }
+    Ok(provider)
 }
