@@ -66,20 +66,7 @@ fn glb_boundary_rejects_damage_and_cache_verifies_content() {
 
 #[test]
 fn native_loader_shares_assets_and_despawns_only_the_deleted_hierarchy() {
-    let mut app = App::new();
-    app.add_plugins((
-        MinimalPlugins,
-        AssetPlugin {
-            file_path: format!("{}/tests/fixtures", env!("CARGO_MANIFEST_DIR")),
-            ..default()
-        },
-        TransformPlugin,
-        MeshPlugin,
-        ImagePlugin::default(),
-        WorldSerializationPlugin,
-        GltfPlugin::default(),
-    ));
-    app.add_observer(geometry::ready);
+    let mut app = app();
     app.finish();
     app.cleanup();
     let server = app.world().resource::<AssetServer>();
@@ -167,4 +154,56 @@ fn import_glb_publishes_validated_bytes_and_save_as_preserves_the_resource() {
     assert_eq!(crate::project::storage::load(&b).unwrap(), doc);
     std::fs::write(&file, b"bad").unwrap();
     assert!(crate::project::storage::import_asset(second.path(), &file).is_err());
+}
+
+pub(super) fn app() -> App {
+    let mut app = App::new();
+    app.add_plugins((
+        MinimalPlugins,
+        AssetPlugin {
+            file_path: format!("{}/tests/fixtures", env!("CARGO_MANIFEST_DIR")),
+            ..default()
+        },
+        TransformPlugin,
+        bevy::camera::visibility::VisibilityPlugin,
+        MeshPlugin,
+        ImagePlugin::default(),
+        WorldSerializationPlugin,
+        GltfPlugin::default(),
+    ));
+    app.add_observer(geometry::ready);
+    app
+}
+
+#[test]
+fn unsafe_hierarchies_empty_scenes_and_external_dependencies_are_rejected() {
+    let edits: [fn(&mut serde_json::Value); 5] = [
+        |j| j["nodes"][1]["children"] = serde_json::json!([0]),
+        |j| j["scenes"][0]["nodes"] = serde_json::json!([]),
+        |j| j["buffers"][0]["uri"] = "https://example.invalid/mesh.bin".into(),
+        |j| {
+            j["extensionsUsed"] = serde_json::json!(["EXT_unsupported"]);
+            j["extensionsRequired"] = serde_json::json!(["EXT_unsupported"]);
+        },
+        |j| {
+            j["nodes"] = (0..300)
+                .map(|i| {
+                    if i == 299 {
+                        serde_json::json!({"mesh":0})
+                    } else {
+                        serde_json::json!({"children":[i+1]})
+                    }
+                })
+                .collect::<Vec<_>>()
+                .into();
+        },
+    ];
+    for edit in edits {
+        let mut container = gltf::binary::Glb::from_slice(FIXTURE).unwrap();
+        let mut json: serde_json::Value = serde_json::from_slice(&container.json).unwrap();
+        edit(&mut json);
+        container.json = std::borrow::Cow::Owned(serde_json::to_vec(&json).unwrap());
+        let bytes = container.to_vec().unwrap();
+        assert!(files::validate(&bytes, files::DEFAULT_MAX_BYTES).is_err());
+    }
 }

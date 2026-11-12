@@ -7,9 +7,9 @@ use std::{
 
 pub fn load(path: &Path) -> Result<ProjectDocument, String> {
     let bytes = crate::map::source::read_limited(path, 32 * 1024 * 1024)?;
-    let document: ProjectDocument =
+    let mut document: ProjectDocument =
         serde_json::from_slice(&bytes).map_err(|_| "Corrupt project JSON")?;
-    document.validate()?;
+    document.migrate()?;
     Ok(document)
 }
 pub fn save(path: &Path, document: &ProjectDocument) -> Result<(), String> {
@@ -49,21 +49,28 @@ pub fn save_as(path: &Path, old: Option<&Path>, document: &ProjectDocument) -> R
     {
         let previous = old.parent().ok_or("Missing previous project directory")?;
         for a in &document.assets {
-            let Ok(source) = asset_path(previous, &a.path) else {
-                continue;
+            let source = match asset_path(previous, &a.path) {
+                Ok(source) => source,
+                Err(e) if document.models.iter().any(|m| m.asset_path == a.path) => {
+                    return Err(format!("Cannot copy used model {}: {e}", a.path));
+                }
+                Err(_) => continue,
             };
             let target = root.join(&a.path);
-            if target.exists() {
+            if target.symlink_metadata().is_ok() {
                 return Err("Save As would overwrite an existing resource".into());
             }
-            controlled_directory(
+            let directory = controlled_directory(
                 root,
                 Path::new(&a.path)
                     .parent()
                     .and_then(|p| p.to_str())
                     .ok_or("Invalid asset directory")?,
             )?;
-            fs::copy(source, target).map_err(|e| e.to_string())?;
+            let stage = crate::map::builder::cache::Staging::new(&directory)?;
+            let staged = stage.path.join("asset");
+            fs::copy(source, &staged).map_err(|e| e.to_string())?;
+            fs::hard_link(staged, target).map_err(|e| e.to_string())?;
         }
     }
     save(path, document)
@@ -88,7 +95,10 @@ pub fn import_asset(root: &Path, source: &Path) -> Result<starter_core::ProjectA
         "Assets/Models"
     };
     let model_bytes = (!texture)
-        .then(|| crate::models::files::read(source, crate::models::files::max_bytes()))
+        .then(|| {
+            crate::models::files::read(source, crate::models::files::max_bytes())
+                .map(|(bytes, _)| bytes)
+        })
         .transpose()?;
     controlled_directory(root, directory)?;
     let relative = format!("{directory}/{file}");
@@ -189,8 +199,43 @@ mod tests {
         fs::create_dir(root.path().join("Assets")).unwrap();
         std::os::unix::fs::symlink(outside.path(), root.path().join("Assets/Models")).unwrap();
         let model = source.path().join("model.glb");
-        fs::write(&model, b"fixture").unwrap();
+        fs::write(&model, include_bytes!("../../tests/fixtures/box.glb")).unwrap();
         assert!(import_asset(root.path(), &model).is_err());
         assert!(!outside.path().join("model.glb").exists());
+    }
+    #[cfg(unix)]
+    #[test]
+    fn save_as_cannot_follow_a_dangling_target_symlink_outside_the_project() {
+        let source = tempfile::tempdir().unwrap();
+        let target = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        fs::create_dir_all(source.path().join("Assets/Models")).unwrap();
+        fs::create_dir_all(target.path().join("Assets/Models")).unwrap();
+        let relative = "Assets/Models/box.glb";
+        fs::write(
+            source.path().join(relative),
+            include_bytes!("../../tests/fixtures/box.glb"),
+        )
+        .unwrap();
+        let mut document = ProjectDocument::default();
+        document.assets.push(starter_core::ProjectAsset {
+            path: relative.into(),
+            media_type: "model/gltf-binary".into(),
+            size: 1,
+        });
+        let original = source.path().join("project.json");
+        save(&original, &document).unwrap();
+        std::os::unix::fs::symlink(outside.path().join("box.glb"), target.path().join(relative))
+            .unwrap();
+        assert!(
+            save_as(
+                &target.path().join("project.json"),
+                Some(&original),
+                &document
+            )
+            .is_err()
+        );
+        assert!(!outside.path().join("box.glb").exists());
+        assert_eq!(load(&original).unwrap(), document);
     }
 }

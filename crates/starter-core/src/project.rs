@@ -59,15 +59,18 @@ pub struct ProjectDocument {
     pub layers: Vec<MapLayer>,
     pub objects: Vec<MapMarker>,
     pub assets: Vec<ProjectAsset>,
-    next_id: u64,
+    #[serde(default)]
+    pub models: Vec<crate::ModelInstance>,
+    pub(crate) next_id: u64,
 }
 impl Default for ProjectDocument {
     fn default() -> Self {
         Self {
-            schema_version: 1,
+            schema_version: 2,
             name: "Untitled Project".into(),
             map_region: None,
             objects: Vec::new(),
+            models: Vec::new(),
             assets: Vec::new(),
             next_id: 1,
             layers: [LayerKind::Terrain, LayerKind::Satellite]
@@ -95,12 +98,12 @@ impl ProjectDocument {
             .expect("validated project layers")
     }
     pub fn validate(&self) -> Result<(), String> {
-        if self.schema_version != 1 {
+        if self.schema_version != 2 {
             return Err("Unsupported project schema version".into());
         }
         if self.name.trim().is_empty()
             || self.name.len() > 256
-            || self.objects.len() > 100_000
+            || self.object_count() > 100_000
             || self.assets.len() > 10_000
         {
             return Err("Invalid project name or item count".into());
@@ -133,6 +136,17 @@ impl ProjectDocument {
                 return Err("Duplicate marker ID or invalid ID sequence".into());
             }
         }
+        for model in &self.models {
+            model.validate()?;
+            if !ids.insert(model.id)
+                || model.id.0 >= self.next_id
+                || !self.assets.iter().any(|a| a.path == model.asset_path)
+            {
+                return Err(
+                    "Duplicate object ID, invalid sequence or unregistered model asset".into(),
+                );
+            }
+        }
         if self.next_id == 0 {
             return Err("Invalid marker ID sequence".into());
         }
@@ -148,6 +162,8 @@ impl ProjectDocument {
 pub fn relative_path(path: &str) -> bool {
     !path.is_empty()
         && !path.contains('\\')
+        && !path.contains(':')
+        && !path.contains('\0')
         && Path::new(path)
             .components()
             .all(|c| matches!(c, Component::Normal(_)))
@@ -159,6 +175,7 @@ pub enum ProjectSelection {
     Manifest,
     Layer(LayerKind),
     Marker(ObjectId),
+    Model(ObjectId),
     Asset(usize),
 }
 #[derive(Clone, Debug, Default)]
@@ -168,6 +185,7 @@ pub struct ProjectState {
     pub revision: u64,
     pub dirty: bool,
     pub placing_marker: bool,
+    pub placing_model: Option<String>,
     pub focus_selected: bool,
 }
 impl ProjectState {
@@ -177,7 +195,7 @@ impl ProjectState {
     }
     pub fn add_marker(&mut self, point: GeoOrigin) -> Result<ObjectId, String> {
         point.validate()?;
-        if self.document.objects.len() >= 100_000 {
+        if self.document.object_count() >= 100_000 {
             return Err("Marker limit reached".into());
         }
         let id = ObjectId(self.document.next_id);
@@ -211,8 +229,9 @@ impl ProjectState {
         Ok(())
     }
     pub fn delete_selected(&mut self) {
-        if let ProjectSelection::Marker(id) = self.selection {
+        if let ProjectSelection::Marker(id) | ProjectSelection::Model(id) = self.selection {
             self.document.objects.retain(|m| m.id != id);
+            self.document.models.retain(|m| m.id != id);
             self.selection = ProjectSelection::Project;
             self.changed();
         }

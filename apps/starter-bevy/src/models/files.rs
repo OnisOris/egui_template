@@ -48,14 +48,54 @@ pub fn validate(bytes: &[u8], limit: u64) -> Result<usize, String> {
     if glb.document.meshes().next().is_none() {
         return Err("Unsupported Model: no mesh geometry".into());
     }
-    glb.document
+    let mut parents = vec![0_u32; glb.document.nodes().len()];
+    for node in glb.document.nodes() {
+        for child in node.children() {
+            parents[child.index()] += 1;
+            if parents[child.index()] > 1 {
+                return Err("Unsupported Model: node has multiple parents".into());
+            }
+        }
+    }
+    let mut forest: Vec<_> = glb
+        .document
+        .nodes()
+        .filter(|n| parents[n.index()] == 0)
+        .map(|n| (n, 1))
+        .collect();
+    let mut visited_count = 0;
+    while let Some((node, depth)) = forest.pop() {
+        if depth > 256 {
+            return Err("Unsupported Model: node hierarchy exceeds 256 levels".into());
+        }
+        visited_count += 1;
+        forest.extend(node.children().map(|n| (n, depth + 1)));
+    }
+    if visited_count != parents.len() {
+        return Err("Unsupported Model: cyclic node hierarchy".into());
+    }
+    let scene = glb
+        .document
         .default_scene()
         .or_else(|| glb.document.scenes().next())
-        .map(|s| s.index())
-        .ok_or_else(|| "Unsupported Model: no scene".into())
+        .ok_or("Unsupported Model: no scene")?;
+    let mut nodes: Vec<_> = scene.nodes().collect();
+    let mut visited = std::collections::HashSet::new();
+    let mut geometry = false;
+    while let Some(node) = nodes.pop() {
+        if !visited.insert(node.index()) {
+            return Err("Unsupported Model: invalid node hierarchy".into());
+        }
+        geometry |= node.mesh().is_some_and(|m| m.primitives().next().is_some());
+        nodes.extend(node.children());
+    }
+    if !geometry {
+        return Err("Unsupported Model: selected scene is empty".into());
+    }
+    Ok(scene.index())
 }
 
-pub fn read(path: &Path, limit: u64) -> Result<Vec<u8>, String> {
+pub fn read(path: &Path, limit: u64) -> Result<(Vec<u8>, usize), String> {
     if !path
         .extension()
         .is_some_and(|e| e.eq_ignore_ascii_case("glb"))
@@ -66,8 +106,8 @@ pub fn read(path: &Path, limit: u64) -> Result<Vec<u8>, String> {
         path,
         usize::try_from(limit).map_err(|_| "Invalid model size limit")?,
     )?;
-    validate(&bytes, limit)?;
-    Ok(bytes)
+    let scene = validate(&bytes, limit)?;
+    Ok((bytes, scene))
 }
 
 pub fn cache_root() -> Option<PathBuf> {
@@ -81,8 +121,7 @@ pub struct Prepared {
 }
 pub fn prepare(root: &Path, relative: &str, cache: &Path, limit: u64) -> Result<Prepared, String> {
     let source = crate::project::storage::asset_path(root, relative)?;
-    let bytes = read(&source, limit)?;
-    let scene = validate(&bytes, limit)?;
+    let (bytes, scene) = read(&source, limit)?;
     let file = format!("{}.glb", blake3::hash(&bytes));
     std::fs::create_dir_all(cache).map_err(|e| e.to_string())?;
     let target = cache.join(&file);

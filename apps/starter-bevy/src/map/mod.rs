@@ -75,7 +75,7 @@ impl Plugin for MapPlugin {
 mod interaction_tests;
 
 #[cfg(test)]
-mod dem_tests;
+pub(crate) mod dem_tests;
 
 #[cfg(test)]
 mod satellite_tests;
@@ -88,3 +88,6 @@ mod imagery_tile_tests;
 
 #[cfg(test)]
 mod project_tests;
+
+#[cfg(test)]
+mod model_placement_tests;

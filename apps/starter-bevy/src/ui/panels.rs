@@ -12,6 +12,11 @@ use crate::{
 };
 
 pub struct Panels<'a> {
+    pub models: (
+        &'a crate::models::assets::ModelAssets,
+        &'a crate::models::instances::ModelScene,
+    ),
+    pub model_pick: &'a mut crate::models::picking::ModelPick,
     pub project: &'a mut crate::project::Project,
     pub project_explorer: &'a mut super::project_explorer::ExplorerState,
     pub project_inspector: &'a mut super::project_inspector::InspectorState,
@@ -37,6 +42,8 @@ pub struct Panels<'a> {
 pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
     let Panels {
         project,
+        models,
+        model_pick,
         project_io,
         project_explorer,
         marker_table,
@@ -61,6 +68,7 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
     let mut open = false;
     let mut map_visible = false;
     let mut viewport_visible = false;
+    let placing_before = project.placing_model.clone();
     workspace.show(ui, |panel_ui, pane| match pane {
         PanelId::Map => {
             map_visible = true;
@@ -113,7 +121,7 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
             if !project_io.benchmark
                 && response.clicked()
                 && real.revision == active.get().map(|(r, _)| r)
-                && let Some(data) = &real.data
+                && real.data.is_some()
                 && let Some(pointer) = response.interact_pointer_pos()
             {
                 let p = pointer - response.rect.min;
@@ -124,14 +132,7 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
                     bevy::math::Vec2::new(size.x, size.y),
                     size.x / size.y.max(1.0),
                 );
-                if let Some(id) = crate::map::objects::pick(
-                    project,
-                    data,
-                    &ray,
-                    (viewport.camera.distance * 0.005).max(4.0),
-                ) {
-                    project.selection = starter_core::ProjectSelection::Marker(id);
-                }
+                model_pick.pending = Some((ray, real.fingerprint(), project_io.generation));
             }
         }
         PanelId::Inspector => {
@@ -144,6 +145,7 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
                     project_io,
                     real,
                     project_inspector,
+                    models,
                 );
             }
         }
@@ -162,6 +164,9 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
     }
     if !map_visible {
         picker.selection.drag_start = None;
+    }
+    if project.placing_model != placing_before && project.placing_model.is_some() {
+        workspace.activate(PanelId::Map);
     }
     if open {
         workspace.activate(PanelId::Viewport);

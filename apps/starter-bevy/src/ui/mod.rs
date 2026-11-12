@@ -17,15 +17,20 @@ use crate::{
 
 pub mod chrome;
 pub mod gallery;
+mod model_inspector;
 pub mod panels;
 pub mod project_explorer;
 pub mod project_inspector;
+mod project_names;
 pub mod project_table;
 
 #[derive(bevy::ecs::system::SystemParam)]
 pub(crate) struct MapUi<'w> {
     project: ResMut<'w, crate::project::Project>,
     project_io: ResMut<'w, crate::project::ProjectIo>,
+    models: Res<'w, crate::models::assets::ModelAssets>,
+    model_scene: Res<'w, crate::models::instances::ModelScene>,
+    model_pick: ResMut<'w, crate::models::picking::ModelPick>,
     picker: NonSendMut<'w, crate::map::picker::MapPicker>,
     active: ResMut<'w, crate::map::region::ActiveMapRegion>,
     runtime: ResMut<'w, crate::map::RegionRuntime>,
@@ -52,6 +57,9 @@ pub(crate) fn editor_ui(
     let MapUi {
         mut project,
         mut project_io,
+        models,
+        model_scene,
+        mut model_pick,
         mut picker,
         mut active,
         mut runtime,
@@ -115,6 +123,8 @@ pub(crate) fn editor_ui(
             panels::Panels {
                 project: &mut project,
                 project_io: &mut project_io,
+                models: (&models, &model_scene),
+                model_pick: &mut model_pick,
                 project_explorer,
                 marker_table,
                 project_inspector,
@@ -157,7 +167,13 @@ pub(crate) fn editor_ui(
             &mut project_io,
         );
     }
-    crate::map::objects::focus(&mut project, &mut picker, &real, &mut viewport);
+    crate::map::objects::focus(
+        &mut project,
+        &mut picker,
+        &real,
+        &mut viewport,
+        &model_scene,
+    );
     metrics.ui_ms = started.elapsed().as_secs_f32() * 1000.0;
     Ok(())
 }
@@ -215,6 +231,7 @@ fn apply(
             if io.benchmark {
                 return;
             }
+            project.placing_model = None;
             project.placing_marker = true;
             ui_state.workspace.ensure_panel(starter_ui::PanelId::Map);
             ui_state.workspace.activate(starter_ui::PanelId::Map);
@@ -272,5 +289,7 @@ mod action_tests;
 #[cfg(test)]
 mod project_ui_tests;
 
+#[cfg(test)]
+mod model_ui_tests;
 #[cfg(test)]
 mod project_inspector_tests;

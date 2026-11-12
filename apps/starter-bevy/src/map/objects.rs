@@ -40,9 +40,12 @@ pub fn terrain_elevation(data: &TerrainPayload, lon: f64, lat: f64) -> Option<f6
     )
 }
 pub fn position(marker: &MapMarker, data: &TerrainPayload) -> Option<Vec3> {
-    let elevation = terrain_elevation(data, marker.longitude, marker.latitude)?;
-    let mut p = wgs84_to_local(data.manifest.origin, marker.longitude, marker.latitude);
-    p[2] = elevation - f64::from(data.manifest.reference_elevation_msl) + marker.altitude_agl;
+    geo_position(marker.longitude, marker.latitude, marker.altitude_agl, data)
+}
+pub fn geo_position(lon: f64, lat: f64, agl: f64, data: &TerrainPayload) -> Option<Vec3> {
+    let elevation = terrain_elevation(data, lon, lat)?;
+    let mut p = wgs84_to_local(data.manifest.origin, lon, lat);
+    p[2] = elevation - f64::from(data.manifest.reference_elevation_msl) + agl;
     Some(to_bevy(p))
 }
 #[derive(Component)]
@@ -174,26 +177,44 @@ pub fn focus(
     picker: &mut super::picker::MapPicker,
     scene: &RealScene,
     viewport: &mut crate::viewport::ViewportState,
+    models: &crate::models::instances::ModelScene,
 ) {
     if !std::mem::take(&mut project.focus_selected) {
         return;
     }
-    if let ProjectSelection::Marker(id) = project.selection
-        && let Some(marker) = project.document.objects.iter().find(|m| m.id == id)
+    if let Some(object) = project
+        .document
+        .object_rows()
+        .find(|m| m.selection == project.selection)
     {
         picker
             .view
             .memory
-            .center_at(walkers::lon_lat(marker.longitude, marker.latitude));
+            .center_at(walkers::lon_lat(object.longitude, object.latitude));
         if let Some(data) = scene.data.as_ref().filter(|d| {
             project
                 .document
                 .map_region
                 .is_some_and(|r| d.manifest.matches(r))
-        }) && let Some(p) = position(marker, data)
+        }) && let Some(p) =
+            geo_position(object.longitude, object.latitude, object.altitude_agl, data)
         {
-            viewport.camera.focus(p);
-            viewport.camera.distance = viewport.camera.distance.min(300.0);
+            let model = models
+                .information
+                .get(&object.id)
+                .filter(|_| object.kind == "Model");
+            viewport
+                .camera
+                .focus(model.and_then(|m| m.center).unwrap_or(p));
+            viewport.camera.distance = if object.kind == "Model" {
+                model
+                    .and_then(|m| m.dimensions)
+                    .map(|d| d.length() * 2.5)
+                    .unwrap_or(30.0)
+                    .max(5.0)
+            } else {
+                viewport.camera.distance.min(300.0)
+            };
         }
     }
 }

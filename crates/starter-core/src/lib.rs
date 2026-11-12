@@ -13,3 +13,8 @@ pub use geo::{EARTH_RADIUS, GeoBounds, GeoOrigin, MERCATOR_LATITUDE, MapRegion};
 pub use project::{
     LayerKind, MapLayer, MapMarker, ProjectAsset, ProjectDocument, ProjectSelection, ProjectState,
 };
+
+mod project_models;
+pub use project_models::{ModelInstance, ObjectRow};
+#[cfg(test)]
+mod project_model_tests;

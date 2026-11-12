@@ -92,9 +92,9 @@ fn saved_project_restores_region_markers_layers_and_survives_missing_cache_then_
 
 #[test]
 fn documented_project_fixture_is_portable_and_can_be_saved_and_opened() {
-    let document: starter_core::ProjectDocument =
+    let mut document: starter_core::ProjectDocument =
         serde_json::from_str(include_str!("../../../../docs/fixtures/m4-project.json")).unwrap();
-    document.validate().unwrap();
+    document.migrate().unwrap();
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("project.json");
     storage::save_as(&path, None, &document).unwrap();

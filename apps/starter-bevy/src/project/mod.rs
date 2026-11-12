@@ -1,3 +1,4 @@
+mod asset_removal;
 mod io;
 pub(crate) mod scene;
 pub mod storage;

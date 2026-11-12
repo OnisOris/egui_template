@@ -20,7 +20,9 @@ pub fn screen_ray(camera: &OrbitCamera, pointer: Vec2, viewport: Vec2, aspect: f
     match camera.projection {
         ProjectionMode::Perspective => Ray {
             origin: camera.eye(),
-            direction: (forward + right * ndc.x * half_height * aspect + up * ndc.y * half_height)
+            direction: (forward * camera.distance
+                + right * ndc.x * half_height * aspect
+                + up * ndc.y * half_height)
                 .normalize(),
         },
         ProjectionMode::Orthographic => Ray {
@@ -95,6 +97,32 @@ mod tests {
             4.0 / 3.0,
         );
         assert!(ray.direction.dot(Vec3::NEG_Z) > 0.99);
+    }
+
+    #[test]
+    fn off_center_perspective_ray_uses_viewport_local_pixels_and_not_camera_distance() {
+        let mut camera = camera_looking_at_origin();
+        let first = screen_ray(
+            &camera,
+            Vec2::new(800.0, 300.0),
+            Vec2::new(800.0, 600.0),
+            4.0 / 3.0,
+        );
+        camera.distance = 1000.0;
+        let second = screen_ray(
+            &camera,
+            Vec2::new(800.0, 300.0),
+            Vec2::new(800.0, 600.0),
+            4.0 / 3.0,
+        );
+        assert!(first.direction.abs_diff_eq(second.direction, 0.0001));
+        let (right, _, forward) = camera.basis();
+        assert!(
+            (first.direction.dot(right) / first.direction.dot(forward)
+                - (FOV * 0.5).tan() * 4.0 / 3.0)
+                .abs()
+                < 0.0001
+        );
     }
 
     #[test]

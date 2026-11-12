@@ -5,44 +5,7 @@ use crate::{
 use bevy_egui::egui::{self, Ui};
 use starter_core::{LayerKind, ProjectSelection};
 
-#[derive(Default)]
-pub struct InspectorState {
-    selection: Option<ProjectSelection>,
-    source_name: String,
-    name_draft: String,
-    error: Option<String>,
-}
-impl InspectorState {
-    pub(super) fn name(
-        &mut self,
-        ui: &mut Ui,
-        selection: &ProjectSelection,
-        name: &str,
-    ) -> Option<String> {
-        if self.selection.as_ref() != Some(selection) || self.source_name != name {
-            self.selection = Some(selection.clone());
-            self.source_name = name.to_owned();
-            self.name_draft = name.to_owned();
-            self.error = None;
-        }
-        let response = ui.text_edit_singleline(&mut self.name_draft);
-        let commit = response.lost_focus()
-            || (response.has_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)));
-        if commit {
-            let name = self.name_draft.trim();
-            if name.is_empty() || name.len() > starter_core::MAX_NAME_LENGTH {
-                self.error = Some("Name must contain 1–256 characters.".into());
-            } else {
-                self.error = None;
-                return Some(name.to_owned());
-            }
-        }
-        if let Some(error) = &self.error {
-            ui.colored_label(ui.visuals().error_fg_color, error);
-        }
-        None
-    }
-}
+pub use super::project_names::InspectorState;
 
 pub fn show(
     ui: &mut Ui,
@@ -50,7 +13,12 @@ pub fn show(
     io: &ProjectIo,
     real: &mut RealScene,
     inspector: &mut InspectorState,
+    models: (
+        &crate::models::assets::ModelAssets,
+        &crate::models::instances::ModelScene,
+    ),
 ) {
+    inspector.sync(project, io.generation);
     ui.heading("Inspector");
     match project.selection.clone() {
         ProjectSelection::Project => {
@@ -73,8 +41,10 @@ pub fn show(
                 "Saved"
             });
         }
+        ProjectSelection::Model(id) => {
+            super::model_inspector::show(ui, project, inspector, id, real, models)
+        }
         ProjectSelection::Manifest => {
-            inspector.selection = None;
             ui.strong("Project JSON");
             ui.label(
                 io.path
@@ -91,7 +61,6 @@ pub fn show(
             );
         }
         ProjectSelection::Layer(kind) => {
-            inspector.selection = None;
             ui.strong(format!("{kind:?}"));
             if real.data.as_ref().is_some_and(|d| {
                 project
@@ -198,11 +167,13 @@ pub fn show(
             }
         }
         ProjectSelection::Asset(i) => {
-            inspector.selection = None;
             if let Some(asset) = project.document.assets.get(i) {
                 ui.strong("Project resource");
                 ui.label(&asset.path);
                 ui.label(&asset.media_type);
+                if let Some(model) = models.0.entries.get(&asset.path) {
+                    ui.label(model.status.to_string());
+                }
                 ui.label(format!("{} bytes", asset.size));
                 ui.label(if io.missing.get(i) == Some(&true) {
                     "Missing resource"

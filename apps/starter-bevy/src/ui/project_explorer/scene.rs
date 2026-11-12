@@ -46,11 +46,19 @@ pub fn build(
         }
         b.close_dir();
         if b.dir(Node::Objects, "Objects") {
-            for marker in &project.document.objects {
+            for marker in project.document.object_rows() {
                 b.leaf(
-                    Node::Marker(marker.id),
+                    match marker.selection {
+                        starter_core::ProjectSelection::Model(id) => Node::Model(id),
+                        _ => Node::Marker(marker.id),
+                    },
                     format!(
-                        "{}{}",
+                        "{}{}{}",
+                        if marker.kind == "Model" {
+                            "Model · "
+                        } else {
+                            ""
+                        },
                         marker.name,
                         if marker.visible { "" } else { " [hidden]" }
                     ),

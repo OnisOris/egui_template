@@ -80,8 +80,10 @@ impl MapPicker {
                 tiles as &mut dyn Tiles
             })
         };
-        let selecting =
-            self.view.tool == Tool::Select && project.as_ref().is_none_or(|p| !p.placing_marker);
+        let selecting = self.view.tool == Tool::Select
+            && project
+                .as_ref()
+                .is_none_or(|p| !p.placing_marker && p.placing_model.is_none());
         let dragging = self.selection.drag_start.is_some();
         Map::new(tiles, &mut self.view.memory, initial_center())
             .zoom_with_ctrl(false)

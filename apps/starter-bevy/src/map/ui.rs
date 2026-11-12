@@ -69,7 +69,9 @@ pub fn show(
             .tiles
             .get_or_insert_with(|| MapTiles::new(ui.ctx().clone()));
     }
-    if project.placing_marker {
+    if project.placing_model.is_some() {
+        ui.label("Click the map to place Model · Escape to cancel");
+    } else if project.placing_marker {
         ui.label("Click the map to place Marker · Escape to cancel");
     }
     picker.show_project_map(ui, active.get().map(|(_, r)| r.bounds), project);

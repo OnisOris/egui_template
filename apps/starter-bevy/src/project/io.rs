@@ -15,6 +15,7 @@ pub enum ProjectAction {
     SaveAs,
     Import,
     Refresh,
+    RemoveAsset(usize),
     Exit,
 }
 enum Completed {
@@ -22,6 +23,7 @@ enum Completed {
     Saved(PathBuf, u64, u64),
     Imported(ProjectAsset),
     Refreshed(Vec<bool>),
+    Removed(usize),
     Cancelled,
 }
 #[derive(Resource, Default)]
@@ -87,6 +89,9 @@ impl ProjectIo {
             self.exit = true;
             return;
         }
+        if matches!(action, ProjectAction::RemoveAsset(_)) {
+            project.placing_model = None;
+        }
         let old = self.path.clone();
         let snapshot = project.document.clone();
         let revision = project.revision;
@@ -136,6 +141,15 @@ impl ProjectIo {
                             .map(|a| storage::asset_path(root, &a.path).is_err())
                             .collect(),
                     ))
+                }
+                ProjectAction::RemoveAsset(index) => {
+                    let path = old.ok_or("Save the project first")?;
+                    super::asset_removal::remove(
+                        path.parent().ok_or("Missing project directory")?,
+                        &snapshot,
+                        index,
+                    )?;
+                    Ok(Completed::Removed(index))
                 }
                 ProjectAction::Import => {
                     let path = old.ok_or("Save the project before importing assets")?;
@@ -200,6 +214,14 @@ pub fn poll(
                 project.document.assets.push(asset);
                 project.changed();
                 io.missing.push(false);
+            }
+            Ok(Completed::Removed(index)) => {
+                project.document.assets.remove(index);
+                if index < io.missing.len() {
+                    io.missing.remove(index);
+                }
+                project.selection = starter_core::ProjectSelection::Project;
+                project.changed();
             }
             Ok(Completed::Refreshed(missing)) => {
                 io.generation = io.generation.wrapping_add(1);

@@ -1,5 +1,5 @@
 use bevy_egui::egui::{self, Ui};
-use starter_core::{ProjectSelection, ProjectState};
+use starter_core::ProjectState;
 use starter_ui::{CellInfo, Column, HeaderCellInfo, TableDelegate, show_table};
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum Sort {
@@ -33,8 +33,7 @@ impl TableState {
         let query = self.filter.to_lowercase();
         self.rows = project
             .document
-            .objects
-            .iter()
+            .object_rows()
             .enumerate()
             .filter(|(_, m)| {
                 query.is_empty()
@@ -44,11 +43,11 @@ impl TableState {
             .map(|(i, _)| i)
             .collect();
         self.rows.sort_by(|a, b| {
-            let a = &project.document.objects[*a];
-            let b = &project.document.objects[*b];
+            let a = project.document.object_at(*a).unwrap();
+            let b = project.document.object_at(*b).unwrap();
             let order = match self.sort {
                 Sort::Id => a.id.cmp(&b.id),
-                Sort::Name => a.name.cmp(&b.name),
+                Sort::Name => a.name.cmp(b.name),
                 Sort::Latitude => a.latitude.total_cmp(&b.latitude),
                 Sort::Longitude => a.longitude.total_cmp(&b.longitude),
                 Sort::Altitude => a.altitude_agl.total_cmp(&b.altitude_agl),
@@ -127,15 +126,15 @@ impl TableDelegate for Markers<'_> {
         let Some(m) = self
             .rows
             .get(cell.row_nr as usize)
-            .and_then(|i| self.project.document.objects.get(*i))
+            .and_then(|i| self.project.document.object_at(*i))
         else {
             return;
         };
         let id = m.id;
         let text = match cell.col_nr {
             0 => id.0.to_string(),
-            1 => m.name.clone(),
-            2 => "Marker".into(),
+            1 => m.name.to_owned(),
+            2 => m.kind.into(),
             3 => format!("{:.7}", m.latitude),
             4 => format!("{:.7}", m.longitude),
             5 => format!("{:.2}", m.altitude_agl),
@@ -143,10 +142,10 @@ impl TableDelegate for Markers<'_> {
             _ => String::new(),
         };
         if ui
-            .selectable_label(self.project.selection == ProjectSelection::Marker(id), text)
+            .selectable_label(self.project.selection == m.selection, text)
             .clicked()
         {
-            self.project.selection = ProjectSelection::Marker(id);
+            self.project.selection = m.selection;
         }
     }
 }

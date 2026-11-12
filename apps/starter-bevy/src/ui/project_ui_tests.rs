@@ -24,6 +24,20 @@ fn explorer_and_virtual_table_select_the_same_document_markers() {
             longitude: 8.1,
         })
         .unwrap();
+    project.document.assets.push(starter_core::ProjectAsset {
+        path: "Assets/Models/box.glb".into(),
+        media_type: "model/gltf-binary".into(),
+        size: 1,
+    });
+    let model = project
+        .add_model(
+            "Assets/Models/box.glb".into(),
+            GeoOrigin {
+                latitude: 46.0,
+                longitude: 8.0,
+            },
+        )
+        .unwrap();
     project.selection = ProjectSelection::Project;
     let mut harness = Harness::new_ui_state(
         |ui,
@@ -76,4 +90,18 @@ fn explorer_and_virtual_table_select_the_same_document_markers() {
         harness.state().0.selection,
         ProjectSelection::Marker(second)
     );
+    harness
+        .query_all_by_label("Model · Model 3")
+        .next()
+        .unwrap()
+        .click();
+    harness.run();
+    assert_eq!(harness.state().0.selection, ProjectSelection::Model(model));
+    harness
+        .query_all_by_label("Model 3")
+        .last()
+        .unwrap()
+        .click();
+    harness.run();
+    assert_eq!(harness.state().0.selection, ProjectSelection::Model(model));
 }

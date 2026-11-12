@@ -31,7 +31,7 @@ pub struct ModelAsset {
     pub status: ModelStatus,
     pub scene: Option<Handle<WorldAsset>>,
     pub gltf: Option<Handle<Gltf>>,
-    task: Option<Task<Result<files::Prepared, String>>>,
+    pub(super) task: Option<Task<Result<files::Prepared, String>>>,
 }
 #[derive(Resource)]
 pub struct ModelAssets {

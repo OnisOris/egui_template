@@ -7,3 +7,6 @@ The resulting bounds are `(2, 5, -1)` to `(6, 11, 1)`.
 
 The intentionally displaced pivot tests descendant transforms and base anchoring.
 The file embeds its indexed triangle geometry and a simple blue PBR material.
+
+`orange-box.glb` is a second owned variant with an orange material and child
+scale `(1, 2, 1)`. It checks loading distinct files alongside shared instances.

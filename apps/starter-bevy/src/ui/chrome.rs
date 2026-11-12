@@ -17,14 +17,14 @@ pub fn show(
     let count = if benchmark {
         document.document().objects().len()
     } else {
-        project.document.objects.len()
+        project.document.object_count()
     };
     let selected = if benchmark {
         document.selection().len()
     } else {
         usize::from(matches!(
             project.selection,
-            starter_core::ProjectSelection::Marker(_)
+            starter_core::ProjectSelection::Marker(_) | starter_core::ProjectSelection::Model(_)
         ))
     };
     let mut actions = menu(ui, workspace, projection, sensitivity);

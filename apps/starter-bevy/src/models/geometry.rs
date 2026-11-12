@@ -54,7 +54,7 @@ pub fn ready(
             stack.extend(children.iter().map(|e| (e, matrix)));
         }
     }
-    if min.is_finite() && max.is_finite() && min.cmple(max).all() {
+    if min.is_finite() && max.is_finite() && (max - min).is_finite() && min.cmple(max).all() {
         root.bounds = Some((min, max));
     } else {
         root.error = Some("Unsupported Model: selected scene has no finite mesh bounds".into());
