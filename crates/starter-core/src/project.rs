@@ -10,6 +10,8 @@ use std::{
 pub enum LayerKind {
     Terrain,
     Satellite,
+    Roads,
+    Buildings,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MapLayer {
@@ -54,6 +56,10 @@ pub struct ProjectAsset {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ProjectDocument {
     pub schema_version: u32,
+    #[serde(default)]
+    pub geo_view_mode: crate::GeoViewMode,
+    #[serde(default)]
+    pub vector_source: crate::VectorSource,
     pub name: String,
     pub map_region: Option<MapRegion>,
     pub layers: Vec<MapLayer>,
@@ -66,14 +72,16 @@ pub struct ProjectDocument {
 impl Default for ProjectDocument {
     fn default() -> Self {
         Self {
-            schema_version: 2,
+            schema_version: 3,
+            geo_view_mode: crate::GeoViewMode::City,
+            vector_source: crate::VectorSource::OpenFreeMap,
             name: "Untitled Project".into(),
             map_region: None,
             objects: Vec::new(),
             models: Vec::new(),
             assets: Vec::new(),
             next_id: 1,
-            layers: [LayerKind::Terrain, LayerKind::Satellite]
+            layers: LayerKind::ALL
                 .into_iter()
                 .map(|kind| MapLayer {
                     kind,
@@ -98,7 +106,7 @@ impl ProjectDocument {
             .expect("validated project layers")
     }
     pub fn validate(&self) -> Result<(), String> {
-        if self.schema_version != 2 {
+        if self.schema_version != 3 {
             return Err("Unsupported project schema version".into());
         }
         if self.name.trim().is_empty()
@@ -111,12 +119,14 @@ impl ProjectDocument {
         if let Some(r) = self.map_region {
             MapRegion::new(r.bounds, r.origin)?;
         }
-        if self.layers.len() != 2
-            || [LayerKind::Terrain, LayerKind::Satellite]
+        if self.layers.len() != 4
+            || LayerKind::ALL
                 .iter()
                 .any(|k| self.layers.iter().filter(|l| l.kind == *k).count() != 1)
         {
-            return Err("Project requires unique Terrain and Satellite layers".into());
+            return Err(
+                "Project requires unique Terrain, Satellite, Roads and Buildings layers".into(),
+            );
         }
         for layer in &self.layers {
             if layer.package_id.as_ref().is_some_and(|id| {

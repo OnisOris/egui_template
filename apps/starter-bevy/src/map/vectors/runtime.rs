@@ -1,7 +1,11 @@
-use super::{data::VectorData, mesh, package, source};
+use super::{
+    data::VectorData,
+    loading::{self, Load},
+    mesh,
+};
 use crate::map::{
     RegionRuntime,
-    builder::{Job, cache},
+    builder::Job,
     real_scene::{RealScene, SceneAssets},
     region::ActiveMapRegion,
 };
@@ -10,14 +14,14 @@ use bevy::{
     prelude::*,
     tasks::{AsyncComputeTaskPool, Task, futures_lite::future},
 };
-use std::sync::{
-    Arc, Mutex,
-    atomic::{AtomicBool, Ordering},
-};
+use std::sync::{Arc, atomic::Ordering};
 
 #[derive(Resource, Default)]
 pub struct VectorScene {
-    task: Option<Task<Result<Option<VectorData>, String>>>,
+    task: Option<loading::ResultTask>,
+    restore_attempted: bool,
+    project_generation: u64,
+    imported: bool,
     mesh_task: Option<Task<Vec<mesh::Chunk>>>,
     job: Option<Job>,
     revision: Option<u64>,
@@ -46,31 +50,13 @@ impl VectorScene {
         self.task = None;
         self.mesh_task = None;
     }
-    fn start(&mut self, region: starter_core::MapRegion, manual: bool) {
+    fn start(&mut self, region: starter_core::MapRegion, request: Load) {
         self.cancel();
-        let job = Job {
-            cancelled: Arc::new(AtomicBool::new(false)),
-            progress: Arc::new(Mutex::new("Vectors: Loading…".into())),
-        };
-        self.job = Some(job.clone());
-        self.task = Some(AsyncComputeTaskPool::get().spawn(async move {
-            let root = cache::root()?;
-            let data = if manual {
-                let Some(path) = rfd::FileDialog::new()
-                    .set_title("Import map-data v2 vectors")
-                    .pick_folder()
-                else {
-                    return Ok(None);
-                };
-                let data = package::load(&path, region)?;
-                source::store_cache(&data, &root.join("vectors").join(&data.package_id))?;
-                data
-            } else {
-                source::load(region, &root, source::TILEJSON, &job)?
-            };
-            job.check()?;
-            Ok(Some(data))
-        }));
+        self.imported = matches!(request, Load::Import);
+        let (job, task) = loading::start(region, request);
+        self.job = Some(job);
+        self.task = Some(task);
+        self.restore_attempted = true;
     }
 }
 pub fn update(
@@ -80,9 +66,16 @@ pub fn update(
     mut scene: ResMut<RealScene>,
     mut vectors: ResMut<VectorScene>,
     mut assets: SceneAssets,
+    mut project: ResMut<crate::project::Project>,
+    io: Res<crate::project::ProjectIo>,
 ) {
     let revision = active.get().map(|(r, _)| r);
-    if vectors.revision != revision || scene.data.is_none() && vectors.terrain.is_some() {
+    if vectors.revision != revision
+        || vectors.project_generation != io.generation
+        || scene.data.is_none() && vectors.terrain.is_some()
+    {
+        vectors.project_generation = io.generation;
+        vectors.restore_attempted = false;
         vectors.cancel();
         vectors.clear(&mut commands, &mut assets);
         vectors.data = None;
@@ -95,7 +88,35 @@ pub fn update(
     if (manual || automatic)
         && let Some((_, region)) = active.get()
     {
-        vectors.start(region, manual);
+        let id = project
+            .document
+            .layer(starter_core::LayerKind::Roads)
+            .package_id
+            .clone();
+        if manual {
+            vectors.start(region, Load::Import)
+        } else if project.document.vector_source == starter_core::VectorSource::OpenFreeMap {
+            vectors.start(region, Load::Online)
+        } else if let Some(id) = id {
+            vectors.start(region, Load::Cached(id))
+        } else {
+            scene.vector_status = "Vectors: Unavailable · Import Vectors for this region".into();
+        }
+    }
+    if !vectors.restore_attempted
+        && vectors.task.is_none()
+        && scene.revision == revision
+        && let Some((_, region)) = active.get()
+    {
+        vectors.restore_attempted = true;
+        if let Some(id) = project
+            .document
+            .layer(starter_core::LayerKind::Roads)
+            .package_id
+            .clone()
+        {
+            vectors.start(region, Load::Cached(id));
+        }
     }
     if let Some(job) = &vectors.job
         && vectors.task.is_some()
@@ -111,10 +132,37 @@ pub fn update(
             Err(e) => scene.vector_status = format!("Vectors: Failed · {e}"),
             Ok(None) => scene.vector_status = "Vectors: Import cancelled".into(),
             Ok(Some(data)) => {
-                vectors.clear(&mut commands, &mut assets);
-                vectors.data = Some(Arc::new(data));
-                vectors.terrain = None;
-                scene.vector_status = "Vectors: Ready · waiting for matching terrain".into();
+                let mut changed = false;
+                if vectors.imported
+                    && project.document.vector_source != starter_core::VectorSource::LocalPackage
+                {
+                    changed = true;
+                    project.document.vector_source = starter_core::VectorSource::LocalPackage;
+                }
+                for kind in [
+                    starter_core::LayerKind::Roads,
+                    starter_core::LayerKind::Buildings,
+                ] {
+                    if project.document.layer(kind).package_id.as_ref() != Some(&data.package_id) {
+                        project.document.layer_mut(kind).package_id = Some(data.package_id.clone());
+                        changed = true;
+                    }
+                }
+                if changed {
+                    project.changed();
+                }
+                if vectors
+                    .data
+                    .as_ref()
+                    .is_some_and(|d| d.fingerprint == data.fingerprint && d.region == data.region)
+                {
+                    scene.vector_status = ready(&data);
+                } else {
+                    vectors.clear(&mut commands, &mut assets);
+                    vectors.data = Some(Arc::new(data));
+                    vectors.terrain = None;
+                    scene.vector_status = "Vectors: Loading · waiting for matching terrain".into();
+                }
             }
         }
     }
@@ -128,7 +176,8 @@ pub fn update(
         vectors.terrain = Some(terrain.fingerprint);
         vectors.mesh_task = Some(AsyncComputeTaskPool::get().spawn(async move {
             let started = std::time::Instant::now();
-            let chunks = mesh::build(&data, &terrain, false);
+            let mut chunks = mesh::build(&data, &terrain, false);
+            chunks.extend(mesh::build(&data, &terrain, true));
             info!(
                 "Vector meshes: {} buildings, {} roads, {} chunks in {:.3} ms",
                 data.buildings.len(),
@@ -172,6 +221,10 @@ pub fn update(
                     } else {
                         road.clone()
                     }),
+                    VectorChunk {
+                        flat: c.flat,
+                        buildings: c.buildings,
+                    },
                     RenderLayers::layer(3),
                 ))
                 .id(),
@@ -180,11 +233,50 @@ pub fn update(
     }
     vectors.materials = vec![road, building];
     if let Some(data) = &vectors.data {
-        scene.vector_status = format!(
-            "Vectors: Ready · {} buildings · {} roads · {}",
-            data.buildings.len(),
-            data.roads.len(),
-            data.attribution
-        );
+        scene.vector_status = ready(data);
     }
+}
+
+#[derive(Component)]
+pub struct VectorChunk {
+    pub flat: bool,
+    pub buildings: bool,
+}
+pub fn visibility(
+    project: Res<crate::project::Project>,
+    mut chunks: Query<(&VectorChunk, &mut Visibility)>,
+) {
+    for (chunk, mut current) in &mut chunks {
+        let mode = project.document.geo_view_mode;
+        let layer = if chunk.buildings {
+            starter_core::LayerKind::Buildings
+        } else {
+            starter_core::LayerKind::Roads
+        };
+        let shown = mode != starter_core::GeoViewMode::Terrain
+            && chunk.flat == (mode == starter_core::GeoViewMode::City)
+            && project.document.layer(layer).visible;
+        let next = if shown {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
+        if *current != next {
+            *current = next;
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "runtime_tests.rs"]
+mod tests;
+
+fn ready(data: &VectorData) -> String {
+    format!(
+        "Vectors: Ready · {} buildings · {} roads · {} · {}",
+        data.buildings.len(),
+        data.roads.len(),
+        data.source,
+        data.attribution
+    )
 }

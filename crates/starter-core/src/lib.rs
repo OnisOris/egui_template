@@ -18,3 +18,6 @@ mod project_models;
 pub use project_models::{ModelInstance, ObjectRow};
 #[cfg(test)]
 mod project_model_tests;
+
+mod geo_view;
+pub use geo_view::{GeoViewMode, VectorSource};

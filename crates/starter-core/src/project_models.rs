@@ -145,6 +145,25 @@ impl crate::ProjectDocument {
         if self.schema_version == 1 && self.models.is_empty() {
             self.schema_version = 2;
         }
+        if self.schema_version == 2 {
+            let kinds = [crate::LayerKind::Terrain, crate::LayerKind::Satellite];
+            if self.layers.len() != 2
+                || kinds
+                    .iter()
+                    .any(|k| self.layers.iter().filter(|l| l.kind == *k).count() != 1)
+            {
+                return Err("Invalid legacy project layers".into());
+            }
+            for kind in [crate::LayerKind::Roads, crate::LayerKind::Buildings] {
+                self.layers.push(crate::MapLayer {
+                    kind,
+                    visible: true,
+                    package_id: None,
+                });
+            }
+            self.geo_view_mode = crate::GeoViewMode::Terrain;
+            self.schema_version = 3;
+        }
         self.validate()
     }
 }

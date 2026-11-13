@@ -92,6 +92,15 @@ fn local_tilejson_cache_and_cancellation_need_no_public_server() {
     let reused = source::load(region(), dir.path(), &url, &job).unwrap();
     assert_eq!(seen.lock().unwrap().len(), n);
     assert_eq!(reused.fingerprint, data.fingerprint);
+    let cache = dir
+        .path()
+        .join("vectors")
+        .join(&data.package_id)
+        .join("roads.bin");
+    std::fs::write(cache, [255u8; 8]).unwrap();
+    let repaired = source::load(region(), dir.path(), &url, &job).unwrap();
+    assert_eq!(repaired.fingerprint, data.fingerprint);
+    assert_eq!(seen.lock().unwrap().len(), n + 1); // TileJSON reloaded; the validated PBF is reused.
     stop.store(true, Ordering::Relaxed);
     thread.join().unwrap();
     job.cancelled.store(true, Ordering::Relaxed);

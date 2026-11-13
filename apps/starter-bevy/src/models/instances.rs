@@ -31,11 +31,20 @@ pub fn transform(
     data: &crate::map::source::TerrainPayload,
     min_y: f32,
 ) -> Option<Transform> {
-    let p = crate::map::objects::geo_position(
+    transform_for_view(model, data, min_y, starter_core::GeoViewMode::Terrain)
+}
+pub fn transform_for_view(
+    model: &ModelInstance,
+    data: &crate::map::source::TerrainPayload,
+    min_y: f32,
+    mode: starter_core::GeoViewMode,
+) -> Option<Transform> {
+    let p = crate::map::objects::view_position(
         model.longitude,
         model.latitude,
         model.altitude_agl,
         data,
+        mode,
     )?;
     Some(
         Transform::from_translation(p - Vec3::Y * min_y * model.scale)
@@ -95,7 +104,9 @@ pub fn sync(
             dimensions: None,
             center: None,
         };
-        let Some(position) = data.and_then(|d| transform(model, d, 0.0)) else {
+        let Some(position) =
+            data.and_then(|d| transform_for_view(model, d, 0., project.document.geo_view_mode))
+        else {
             if let Some(entity) = scene.entities.remove(&model.id) {
                 commands.entity(entity).despawn();
             }

@@ -48,6 +48,19 @@ pub fn geo_position(lon: f64, lat: f64, agl: f64, data: &TerrainPayload) -> Opti
     p[2] = elevation - f64::from(data.manifest.reference_elevation_msl) + agl;
     Some(to_bevy(p))
 }
+pub fn view_position(
+    lon: f64,
+    lat: f64,
+    agl: f64,
+    data: &TerrainPayload,
+    mode: starter_core::GeoViewMode,
+) -> Option<Vec3> {
+    let mut p = geo_position(lon, lat, agl, data)?;
+    if mode == starter_core::GeoViewMode::City {
+        p.y = agl as f32;
+    }
+    Some(p)
+}
 #[derive(Component)]
 pub struct ProjectedMarker(pub ObjectId);
 #[derive(PartialEq)]
@@ -98,7 +111,16 @@ pub fn sync(
                 .objects
                 .iter()
                 .filter(|m| m.visible)
-                .filter_map(|m| position(m, d).map(|p| (m.id, (m, p))))
+                .filter_map(|m| {
+                    view_position(
+                        m.longitude,
+                        m.latitude,
+                        m.altitude_agl,
+                        d,
+                        project.document.geo_view_mode,
+                    )
+                    .map(|p| (m.id, (m, p)))
+                })
                 .collect()
         })
         .unwrap_or_default();
@@ -196,9 +218,13 @@ pub fn focus(
                 .document
                 .map_region
                 .is_some_and(|r| d.manifest.matches(r))
-        }) && let Some(p) =
-            geo_position(object.longitude, object.latitude, object.altitude_agl, data)
-        {
+        }) && let Some(p) = view_position(
+            object.longitude,
+            object.latitude,
+            object.altitude_agl,
+            data,
+            project.document.geo_view_mode,
+        ) {
             let model = models
                 .information
                 .get(&object.id)
@@ -231,7 +257,13 @@ pub fn pick(
         .iter()
         .filter(|m| m.visible)
         .filter_map(|m| {
-            let p = position(m, data)?;
+            let p = view_position(
+                m.longitude,
+                m.latitude,
+                m.altitude_agl,
+                data,
+                project.document.geo_view_mode,
+            )?;
             crate::viewport::picking::ray_sphere(ray, p, radius).map(|distance| (distance, m.id))
         })
         .min_by(|a, b| a.0.total_cmp(&b.0))

@@ -48,6 +48,9 @@ pub fn viewport_bar(
     ui.horizontal_wrapped(|ui| {
         ui.strong(match runtime.mode {
             SceneMode::Demo => "Demo · synthetic",
+            SceneMode::Real if scene.view_mode == starter_core::GeoViewMode::City => {
+                "City 3D · Flat ground"
+            }
             SceneMode::Real if scene.satellite_enabled => "Real DEM · Satellite",
             SceneMode::Real => "Real DEM · Terrain",
             SceneMode::Editor if benchmark => "Demo / Benchmark",

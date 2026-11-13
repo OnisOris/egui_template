@@ -13,7 +13,7 @@ pub fn build(
 ) {
     if b.dir(Node::Project, "Scene") {
         if b.dir(Node::Map, "Map") {
-            for kind in [LayerKind::Terrain, LayerKind::Satellite] {
+            for kind in LayerKind::ALL {
                 let layer = project.document.layer(kind);
                 let current = project
                     .document
@@ -22,6 +22,9 @@ pub fn build(
                 let present = match kind {
                     LayerKind::Terrain => real.data.is_some(),
                     LayerKind::Satellite => real.satellite.is_some(),
+                    LayerKind::Roads | LayerKind::Buildings => {
+                        real.vector_status.starts_with("Vectors: Ready")
+                    }
                 };
                 let ready = current && present;
                 let status = if ready {

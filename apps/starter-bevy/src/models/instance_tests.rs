@@ -101,6 +101,10 @@ fn ready(app: &mut App, count: usize) {
 #[test]
 fn no_dem_preserves_coordinates_then_native_instances_anchor_and_update_independently() {
     let mut app = app();
+    app.world_mut()
+        .resource_mut::<Project>()
+        .document
+        .geo_view_mode = starter_core::GeoViewMode::Terrain;
     let region_dir = crate::map::dem_tests::package(3, 3);
     let data = crate::map::source::load_terrain(region_dir.path()).unwrap();
     let point = data.manifest.bbox.center();

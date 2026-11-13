@@ -82,6 +82,24 @@ pub fn show(
                 }
             }
             match kind {
+                LayerKind::Roads | LayerKind::Buildings => {
+                    ui.label(&real.vector_status);
+                    let mut source = project.document.vector_source;
+                    ui.radio_value(
+                        &mut source,
+                        starter_core::VectorSource::OpenFreeMap,
+                        "OpenFreeMap (automatic)",
+                    );
+                    ui.radio_value(
+                        &mut source,
+                        starter_core::VectorSource::LocalPackage,
+                        "Local Package",
+                    );
+                    if source != project.document.vector_source {
+                        project.document.vector_source = source;
+                        project.changed();
+                    }
+                }
                 LayerKind::Terrain => {
                     if let Some(data) = &real.data {
                         let m = &data.manifest;

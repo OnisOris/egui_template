@@ -69,10 +69,18 @@ pub fn validate(data: &VectorData) -> Result<(), String> {
                 && p.y <= rect.max().y + 0.05
         })
     };
+    let mut render_vertices = 0u64;
     for r in &data.roads {
         if r.id.len() > 256 || r.points.len() < 2 || !valid_points(&r.points) {
             return Err("Invalid road coordinates or ID".into());
         }
+        render_vertices += r
+            .points
+            .windows(2)
+            .map(|p| {
+                (((p[1].x - p[0].x).hypot(p[1].y - p[0].y) / 20.).ceil() as u64).saturating_mul(6)
+            })
+            .sum::<u64>();
     }
     for b in &data.buildings {
         if b.id.len() > 256
@@ -86,6 +94,7 @@ pub fn validate(data: &VectorData) -> Result<(), String> {
             return Err("Invalid building height, polygons or ID".into());
         }
         for p in &b.polygons {
+            render_vertices += p.rings.iter().map(|r| r.len() as u64 * 12).sum::<u64>();
             if p.rings
                 .iter()
                 .any(|r| r.len() < 4 || r.first() != r.last() || !valid_points(r))
@@ -94,6 +103,9 @@ pub fn validate(data: &VectorData) -> Result<(), String> {
                 return Err("Invalid building polygon".into());
             }
         }
+    }
+    if render_vertices > 4_000_000 {
+        return Err("Vector geometry budget exceeded; choose a smaller region".into());
     }
     if count > MAX_POINTS {
         return Err("Vector coordinate limit exceeded".into());

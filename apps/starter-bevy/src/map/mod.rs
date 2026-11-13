@@ -1,4 +1,5 @@
 pub mod builder;
+pub mod city_view;
 pub mod controls;
 pub mod coordinates;
 pub mod dem_mesh;
@@ -58,6 +59,7 @@ impl Plugin for MapPlugin {
             .init_resource::<ActiveMapRegion>()
             .init_resource::<RegionRuntime>()
             .init_resource::<vectors::VectorScene>()
+            .init_resource::<city_view::CityGround>()
             .init_resource::<demo::DemoScene>()
             .init_resource::<loading::TerrainImport>()
             .init_resource::<real_scene::RealScene>()
@@ -77,6 +79,8 @@ impl Plugin for MapPlugin {
                     satellite_scene::update_material,
                     imagery_detail::update,
                     vectors::update,
+                    city_view::update,
+                    vectors::visibility,
                     real_scene::grid_visibility,
                     objects::sync,
                     grid_style::draw,
@@ -126,3 +130,6 @@ mod imagery_lod_tests;
 
 #[cfg(test)]
 mod imagery_measurements;
+
+#[cfg(test)]
+mod city_tests;

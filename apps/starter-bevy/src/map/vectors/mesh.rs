@@ -34,6 +34,7 @@ impl Triangles {
 }
 pub struct Chunk {
     pub buildings: bool,
+    pub flat: bool,
     pub mesh: Mesh,
 }
 pub fn ground(data: &TerrainPayload, p: LocalPoint2) -> Option<f32> {
@@ -141,6 +142,7 @@ pub fn build(data: &VectorData, terrain: &TerrainPayload, flat: bool) -> Vec<Chu
         .filter(|(_, b)| !b.positions.is_empty())
         .map(|((_, _, buildings), b)| Chunk {
             buildings,
+            flat,
             mesh: b.finish(),
         })
         .collect()

@@ -53,3 +53,33 @@ does not clear the DEM, satellite imagery, GLB assets or project markers.
 An authored 125-byte MVT fixture and local HTTP TileJSON server test automatic
 loading, real MVT decoding, source height, cache reuse, cancellation and coverage
 limits without contacting OpenFreeMap in CI.
+
+## Presentation and persistence
+
+`GeoViewMode` is separate from Editor/Demo/Real scene loading:
+
+| Mode | Ground | Buildings/roads | User objects |
+|---|---|---|---|
+| City | Flat, unlit satellite ground | Extruded / flat ribbons | Flat ground + AGL |
+| Terrain | Original DEM and satellite | Hidden | Sampled DEM + AGL |
+| Combined | Original DEM and satellite | Representative DEM bases / draped roads | Sampled DEM + AGL |
+
+City uses one four-vertex geographic ground patch per existing DEM chunk, sharing
+its material and geographic imagery coverage. Corner UVs use the same f64 local
+→ WGS84 → WebMercator crop mapping. Adjacent patches share exact UVs. The original
+DEM meshes are retained unchanged; changing modes swaps mesh handles, updates
+bounds and visibility, and never requests new vectors or changes stored heights.
+Within a flat patch the GPU interpolates Mercator UVs between geographic corners.
+
+Vectors prepare both City and Combined geometry off-thread once per dataset and
+terrain fingerprint. Two shared StandardMaterials serve all chunks. Terrain mode
+hides those entities; returning to City/Combined reuses them. Flat ground and
+vector asset handles are explicitly released on region/project replacement.
+
+New projects use schema v3 and City view. Legacy v1 projects migrate through v2;
+v2 migrates to v3 with Terrain view, retaining Terrain/Satellite layer IDs,
+visibility, bbox/origin, marker/model coordinates, asset paths and stable IDs.
+Roads/Buildings store validated cache IDs, visibility and the vector source enum.
+No ECS/GPU handles, temporary satellite package IDs or secret URLs are serialized.
+Missing vector cache is diagnosed with Reload vectors / Import Vectors actions.
+Restoring a valid cache does not dirty the project or redownload source tiles.

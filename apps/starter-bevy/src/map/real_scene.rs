@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 #[derive(Resource)]
 pub struct RealScene {
+    pub view_mode: starter_core::GeoViewMode,
     pub vector_import_requested: bool,
     pub vector_status: String,
     pub data: Option<Arc<TerrainPayload>>,
@@ -25,6 +26,7 @@ pub struct RealScene {
 impl Default for RealScene {
     fn default() -> Self {
         Self {
+            view_mode: starter_core::GeoViewMode::Terrain,
             vector_import_requested: false,
             vector_status: String::new(),
             data: None,

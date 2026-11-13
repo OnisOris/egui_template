@@ -104,7 +104,7 @@ pub fn show(
         if state.tree.is_open(&Node::Project) {
             rows += 2;
             if state.tree.is_open(&Node::Map) {
-                rows += 2;
+                rows += 4;
             }
             if state.tree.is_open(&Node::Objects) {
                 rows += project.document.object_count();

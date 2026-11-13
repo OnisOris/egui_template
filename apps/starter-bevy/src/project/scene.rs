@@ -61,6 +61,7 @@ pub fn sync_project(
         runtime.mode = SceneMode::Editor;
         runtime.real_requested = false;
         runtime.open_requested = false;
+        runtime.vector_requested = false;
         let _ = document.dispatch(Command::NewDocument);
         if let Some(region) = project.document.map_region {
             let _ = active.confirm(region);
