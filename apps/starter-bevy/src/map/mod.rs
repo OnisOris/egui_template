@@ -4,6 +4,7 @@ pub mod coordinates;
 pub mod dem_mesh;
 pub mod demo;
 mod grid_style;
+pub mod imagery_service;
 pub mod imagery_tiles;
 pub mod imagery_view;
 pub mod loading;

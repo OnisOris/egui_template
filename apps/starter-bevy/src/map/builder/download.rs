@@ -36,6 +36,7 @@ impl Download {
             if let Some(token) = token {
                 request = request.bearer_auth(token);
             }
+            let mut retry_delay = Duration::from_millis(500 << attempt);
             match request.send() {
                 Ok(response) => {
                     let status = response.status();
@@ -56,6 +57,16 @@ impl Download {
                         }
                         return Ok(bytes);
                     }
+                    if status == reqwest::StatusCode::TOO_MANY_REQUESTS
+                        && let Some(value) = response.headers().get(reqwest::header::RETRY_AFTER)
+                    {
+                        // Do not retry earlier than the server permits, even for unsupported date values.
+                        let seconds = value.to_str().ok().and_then(|v| v.parse::<u64>().ok());
+                        match seconds {
+                            Some(seconds) if seconds <= 120 => retry_delay = Duration::from_secs(seconds),
+                            _ => return Err("Source rate limited; retry after the server's Retry-After interval".into()),
+                        }
+                    }
                     last = format!("Source returned HTTP {status}");
                     if !status.is_server_error() && status != reqwest::StatusCode::TOO_MANY_REQUESTS
                     {
@@ -72,9 +83,13 @@ impl Download {
                 }
             }
             if attempt < 2 {
-                for _ in 0..(5 << attempt) {
+                let until = std::time::Instant::now() + retry_delay;
+                while std::time::Instant::now() < until {
                     job.check()?;
-                    std::thread::sleep(Duration::from_millis(100));
+                    std::thread::sleep(
+                        Duration::from_millis(100)
+                            .min(until.saturating_duration_since(std::time::Instant::now())),
+                    );
                 }
             }
         }

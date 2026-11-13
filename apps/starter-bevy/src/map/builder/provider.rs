@@ -10,6 +10,9 @@ pub struct ImageryProvider {
     pub tile_size: u32,
     pub attribution: String,
     pub allow_permanent_packages: bool,
+    /// Explicit permission for dynamic display on terrain; independent of export.
+    #[serde(default)]
+    pub allow_online_3d: bool,
     /// Optional bearer token environment variable name; never the token itself.
     pub bearer_env: Option<String>,
 }

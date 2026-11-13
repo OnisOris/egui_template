@@ -48,6 +48,6 @@ pub fn esri() -> ImageryProvider {
         url:"https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}".into(),
         min_zoom:0,max_zoom:19,tile_size:256,
         attribution:"Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community".into(),
-        allow_permanent_packages:false,bearer_env:None,
+        allow_permanent_packages:false,allow_online_3d:false,bearer_env:None,
     }
 }

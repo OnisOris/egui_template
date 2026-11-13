@@ -10,6 +10,7 @@ fn provider(url: String) -> provider::ImageryProvider {
         tile_size: 256,
         attribution: "Fixture license".into(),
         allow_permanent_packages: true,
+        allow_online_3d: false,
         bearer_env: None,
     }
 }

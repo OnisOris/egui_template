@@ -1,30 +1,20 @@
 //! Walkers raster adapter: existing authorized downloader, no projection or pan/zoom code.
-use super::builder::{
-    Job, cache, coverage::Tile as SourceTile, dem::decode, download::Download,
-    provider::ImageryProvider,
+use super::{
+    builder::{coverage::Tile as SourceTile, provider::ImageryProvider},
+    imagery_service::TileService,
 };
 use bevy_egui::egui::{self, Context, Rect, pos2};
-use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
-        mpsc,
-    },
-};
+use std::collections::{HashMap, HashSet, VecDeque};
 use walkers::{Tile, TileId, TilePiece, Tiles, sources::Attribution};
-type Reply = (TileId, Result<egui::TextureHandle, String>);
 pub struct ImageryTiles {
-    requests: mpsc::SyncSender<TileId>,
-    replies: mpsc::Receiver<Reply>,
+    pub service: TileService,
+    ctx: Context,
     pending: HashSet<TileId>,
     textures: HashMap<TileId, egui::TextureHandle>,
     order: VecDeque<TileId>,
-    job: Job,
     pub provider: ImageryProvider,
     pub error: Option<String>,
     capacity: usize,
-    failed: HashMap<TileId, std::time::Instant>,
 }
 impl ImageryTiles {
     pub fn new(provider: ImageryProvider, ctx: Context) -> Result<Self, String> {
@@ -36,152 +26,67 @@ impl ImageryTiles {
         if provider.bearer_env.is_some() && token.is_none() {
             return Err("Satellite authorization variable is missing".into());
         }
-        Ok(Self::with_token(provider, ctx, token, cache::root()?))
+        let service = TileService::new(provider.clone(), token)?;
+        Ok(Self::from_service(service, ctx))
     }
+    #[cfg(test)]
     pub(super) fn with_token(
         provider: ImageryProvider,
         ctx: Context,
         token: Option<String>,
-        root: std::path::PathBuf,
+        _root: std::path::PathBuf,
     ) -> Self {
-        let (requests, receive) = mpsc::sync_channel::<TileId>(32);
-        let (reply, replies) = mpsc::sync_channel(8);
-        let job = Job {
-            cancelled: Arc::new(AtomicBool::new(false)),
-            progress: Arc::new(Mutex::new(String::new())),
-        };
-        let work = job.clone();
-        let source = provider.clone();
-        std::thread::Builder::new()
-            .name("walkers-satellite".into())
-            .spawn(move || {
-                let setup = (|| {
-                    source.validate_preview()?;
-                    if source.bearer_env.is_some() && token.is_none() {
-                        return Err("Satellite authorization variable is missing".into());
-                    }
-                    Ok::<_, String>((
-                        Download::new(4)?,
-                        root.join("tiles").join(cache::id(&source)?),
-                        token,
-                    ))
-                })();
-                while let Ok(first) = receive.recv() {
-                    if work.check().is_err() {
-                        break;
-                    }
-                    let ids: Vec<_> = std::iter::once(first)
-                        .chain(receive.try_iter().take(7))
-                        .collect();
-                    let result =
-                        setup
-                            .as_ref()
-                            .map_err(Clone::clone)
-                            .and_then(|(http, root, token)| {
-                                let tiles: Vec<_> = ids
-                                    .iter()
-                                    .map(|t| SourceTile {
-                                        z: t.zoom,
-                                        x: t.x,
-                                        y: t.y,
-                                    })
-                                    .collect();
-                                if !source.allow_permanent_packages {
-                                    return http.tiles_memory(
-                                        &source.url,
-                                        token.as_deref(),
-                                        &tiles,
-                                        &work,
-                                    );
-                                }
-                                http.tiles(
-                                    &source.url,
-                                    token.as_deref(),
-                                    &tiles,
-                                    root,
-                                    &work,
-                                    "Downloading satellite map",
-                                )
-                            });
-                    for id in ids {
-                        let decoded = result.as_ref().map_err(Clone::clone).and_then(|tiles| {
-                            let bytes = tiles
-                                .get(&SourceTile {
-                                    z: id.zoom,
-                                    x: id.x,
-                                    y: id.y,
-                                })
-                                .ok_or("Missing satellite tile")?;
-                            let image =
-                                decode(bytes, source.tile_size, false).inspect_err(|_| {
-                                    if source.allow_permanent_packages
-                                        && let Ok((_, root, _)) = &setup
-                                    {
-                                        let _ =
-                                            std::fs::remove_file(root.join(format!(
-                                                "{}/{}/{}.tile",
-                                                id.zoom, id.x, id.y
-                                            )));
-                                    }
-                                })?;
-                            Ok(egui::ColorImage::from_rgb(
-                                [source.tile_size as usize; 2],
-                                image.as_raw(),
-                            ))
-                        });
-                        let texture = decoded.map(|image| {
-                            ctx.load_texture(
-                                format!("satellite/{}/{}/{}", id.zoom, id.x, id.y),
-                                image,
-                                egui::TextureOptions::LINEAR,
-                            )
-                        });
-                        if reply.send((id, texture)).is_err() {
-                            return;
-                        }
-                        ctx.request_repaint();
-                    }
-                }
-            })
-            .expect("Cannot start satellite tile worker");
+        Self::from_service(TileService::new(provider, token).unwrap(), ctx)
+    }
+    pub fn from_service(service: TileService, ctx: Context) -> Self {
+        let provider = service.provider().clone();
         let capacity =
             ((64 * 1024 * 1024) / (provider.tile_size as usize).pow(2) / 4).clamp(4, 128);
         Self {
-            requests,
-            replies,
+            service,
+            ctx,
             pending: HashSet::new(),
             textures: HashMap::new(),
             order: VecDeque::new(),
-            job,
             provider,
             error: None,
             capacity,
-            failed: HashMap::new(),
         }
     }
     pub fn poll(&mut self) {
-        while let Ok((id, result)) = self.replies.try_recv() {
-            self.pending.remove(&id);
-            match result {
-                Ok(texture) => {
-                    self.failed.remove(&id);
-                    self.error = None;
-                    if self.textures.len() >= self.capacity
-                        && let Some(old) = self.order.pop_front()
-                    {
-                        self.textures.remove(&old);
+        for id in self.pending.clone() {
+            if let Some(result) = self.service.request(SourceTile {
+                z: id.zoom,
+                x: id.x,
+                y: id.y,
+            }) {
+                self.pending.remove(&id);
+                match result {
+                    Ok(image) => {
+                        let texture = self.ctx.load_texture(
+                            format!("satellite/{}/{}/{}", id.zoom, id.x, id.y),
+                            egui::ColorImage::from_rgb(
+                                [image.width() as usize, image.height() as usize],
+                                image.as_raw(),
+                            ),
+                            egui::TextureOptions::LINEAR,
+                        );
+                        if self.textures.len() >= self.capacity
+                            && let Some(old) = self.order.pop_front()
+                        {
+                            self.textures.remove(&old);
+                        }
+                        self.textures.insert(id, texture);
+                        self.order.push_back(id);
+                        self.error = None;
                     }
-                    self.textures.insert(id, texture);
-                    self.order.push_back(id);
-                }
-                Err(e) => {
-                    self.error = Some(e);
-                    if self.failed.len() >= self.capacity {
-                        self.failed.clear();
-                    }
-                    self.failed.insert(id, std::time::Instant::now());
+                    Err(e) => self.error = Some(e),
                 }
             }
+        }
+        if !self.pending.is_empty() {
+            self.ctx
+                .request_repaint_after(std::time::Duration::from_millis(30));
         }
     }
     pub fn ready(&self) -> bool {
@@ -210,16 +115,12 @@ impl Tiles for ImageryTiles {
                 Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
             ));
         }
-        if self
-            .failed
-            .get(&id)
-            .is_some_and(|at| at.elapsed() < std::time::Duration::from_secs(5))
-        {
-            return None;
-        }
-        if !self.pending.contains(&id) && self.requests.try_send(id).is_ok() {
-            self.pending.insert(id);
-        }
+        self.service.request(SourceTile {
+            z: id.zoom,
+            x: id.x,
+            y: id.y,
+        });
+        self.pending.insert(id);
         None
     }
     fn attribution(&self) -> Attribution {
@@ -237,10 +138,5 @@ impl Tiles for ImageryTiles {
         walkers::Stats {
             in_progress: self.pending.len(),
         }
-    }
-}
-impl Drop for ImageryTiles {
-    fn drop(&mut self) {
-        self.job.cancelled.store(true, Ordering::Relaxed);
     }
 }
