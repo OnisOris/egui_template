@@ -208,20 +208,7 @@ pub fn install_texture(
     {
         return Err("Satellite UV layout differs from the loaded terrain chunks.".into());
     }
-    let s = &metadata;
-    let mut image = Image::new(
-        Extent3d {
-            width: s.width,
-            height: s.height,
-            depth_or_array_layers: 1,
-        },
-        TextureDimension::D2,
-        rgba,
-        TextureFormat::Rgba8UnormSrgb,
-        RenderAssetUsages::default(),
-    );
-    image.sampler = ImageSampler::linear();
-    let image = assets.images.add(image);
+    let image = assets.images.add(create_image(&metadata, rgba));
     for (uv, handle) in uvs.into_iter().zip(&scene.meshes) {
         assets
             .meshes
@@ -241,6 +228,22 @@ pub fn install_texture(
     scene.satellite_enabled = true;
     scene.grid_enabled = false;
     Ok(())
+}
+
+pub fn create_image(metadata: &super::satellite::SatelliteMetadata, rgba: Vec<u8>) -> Image {
+    let mut image = Image::new(
+        Extent3d {
+            width: metadata.width,
+            height: metadata.height,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        rgba,
+        TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::RENDER_WORLD,
+    );
+    image.sampler = ImageSampler::linear();
+    image
 }
 
 pub fn update_material(scene: Res<RealScene>, mut materials: ResMut<Assets<StandardMaterial>>) {

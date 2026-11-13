@@ -63,3 +63,28 @@ Stage b: `cargo test -p starter-bevy --lib`: 93 passed; `cargo build -p starter-
 passed. Added autonomous Bevy World tests for automatic live installation, shared chunk
 UVs, permission rejection, cancellation and region-change Image removal. These are not
 manual GUI tests.
+
+## Progressive detail
+
+`imagery_lod` selects up to four existing DEM chunks intersecting a conservative camera
+frustum, ordered by distance to their bounding spheres. Camera distance, viewport size,
+FOV, local source resolution and max zoom determine texel density. A 0.65–1.6 density
+hysteresis and 300 ms coverage debounce avoid repeated boundary switching. Each patch
+is capped at 2048 per edge / 64 source tiles. The base mosaic is never rebuilt by camera
+movement. Source maximum zoom is respected; no synthetic extra detail is promised.
+
+`imagery_detail` prepares one patch at a time through the shared service. Each chunk
+uses a StandardMaterial UV transform from base-crop UV → global pixels at the requested
+zoom → patch-crop UV. It never mutates a DEM mesh or creates another terrain surface.
+The base and installed patches remain visible while higher detail is pending or fails.
+A failed patch is retried after five seconds. Moving away releases unneeded patch
+materials and Images; changing source, region, base texture or hiding imagery cancels
+pending patches and frees their GPU assets. Bevy Images use RENDER_WORLD ownership so
+uploaded CPU image copies need not remain in the main world. Four retained patch
+Images and one pending patch bound detail texture buffers; the whole-region base is
+retained for fallback. Material changes occur only on patch installation/removal.
+
+Stage c: 95 library tests passed and the application built. Local multi-zoom fixtures
+prove higher zoom URLs and actual new patch installation, unchanged mesh attributes,
+edge UV transform equivalence, old-texture retention after HTTP 403, and Image/material
+release on zoom-out and region changes. These checks do not measure GPU upload time.

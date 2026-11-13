@@ -138,7 +138,9 @@ impl TileService {
                 || entry.touched.elapsed() < Duration::from_secs(5)
             {
                 let result = entry.result.clone();
-                cache.hits += 1;
+                if matches!(&result, Some(Ok(_))) {
+                    cache.hits += 1;
+                }
                 cache.order.retain(|t| *t != tile);
                 cache.order.push_back(tile);
                 return result;

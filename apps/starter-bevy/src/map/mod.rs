@@ -5,6 +5,8 @@ pub mod dem_mesh;
 pub mod demo;
 mod grid_style;
 pub mod imagery_3d;
+pub mod imagery_detail;
+pub mod imagery_lod;
 pub mod imagery_service;
 pub mod imagery_tiles;
 pub mod imagery_view;
@@ -58,6 +60,7 @@ impl Plugin for MapPlugin {
             .init_resource::<real_scene::RealScene>()
             .init_resource::<satellite_scene::SatelliteImport>()
             .init_resource::<imagery_3d::LiveImagery>()
+            .init_resource::<imagery_detail::ImageryDetail>()
             .add_systems(Startup, (loading::import_from_env, grid_style::setup))
             .add_systems(
                 Update,
@@ -69,6 +72,7 @@ impl Plugin for MapPlugin {
                     satellite_scene::poll_satellite,
                     imagery_3d::update,
                     satellite_scene::update_material,
+                    imagery_detail::update,
                     real_scene::grid_visibility,
                     objects::sync,
                     grid_style::draw,
@@ -112,3 +116,6 @@ mod satellite_import_tests;
 mod imagery_3d_tests;
 #[cfg(test)]
 mod imagery_fixture;
+
+#[cfg(test)]
+mod imagery_lod_tests;
