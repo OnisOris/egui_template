@@ -22,30 +22,14 @@ pub fn show(
     let (import, satellite) = imports;
     let mut open = false;
     egui::Panel::top("map_tools").show(ui, |ui| {
-        ui.heading("Map");
         search_bar(ui, picker);
         picker.imagery.controls(ui);
-        ui.menu_button("⋯ Packages", |ui| {
-            if ui.button("Import Existing Package…").clicked() {
-                if scene.data.is_some()
-                    && scene.revision == active.get().map(|(revision, _)| revision)
-                {
-                    import.builder.cancel();
-                }
-                satellite.start(active, scene, None);
-                ui.close();
-            }
-            if ui.button("Browse Existing Packages…").clicked() {
-                satellite.packages.open = true;
-                ui.close();
-            }
-        });
     });
     egui::ScrollArea::vertical()
         .id_salt("map_region_controls")
         .max_height(220.0)
         .show(ui, |ui| {
-            open = region_details(ui, picker, active, runtime, import, scene);
+            open = region_details(ui, picker, active, runtime, import, satellite, scene);
         });
     egui::Panel::bottom("map_attribution")
         .min_size(28.0)
@@ -100,12 +84,12 @@ fn region_details(
     active: &mut ActiveMapRegion,
     runtime: &mut RegionRuntime,
     import: &mut super::loading::TerrainImport,
+    satellite: &mut super::satellite_scene::SatelliteImport,
     scene: &super::real_scene::RealScene,
 ) -> bool {
     let preview = picker.selection.preview;
     if let Some(b) = preview.or_else(|| active.get().map(|(_, r)| r.bounds)) {
         let (width, height) = b.dimensions();
-        let center = b.center();
         ui.horizontal_wrapped(|ui| {
             ui.strong(if preview.is_some() {
                 "Selected Region · Draft"
@@ -113,16 +97,6 @@ fn region_details(
                 "Selected Region · Confirmed"
             });
             ui.weak(format!("{:.2} × {:.2} km", width / 1000., height / 1000.));
-        });
-        ui.collapsing("Region details", |ui| {
-            ui.label(format!(
-                "Center {:.6}°, {:.6}°",
-                center.latitude, center.longitude
-            ));
-            ui.label(format!(
-                "N {:.6}° · S {:.6}° · W {:.6}° · E {:.6}°",
-                b.north, b.south, b.west, b.east
-            ));
         });
     } else {
         ui.label("Pan and zoom to a place, then use Select Region to draw a rectangle.");
@@ -151,24 +125,13 @@ fn region_details(
         }
         if ui
             .add_enabled(
-                preview.is_some() || picker.selection.error.is_some(),
-                egui::Button::new("Clear Selection"),
-            )
-            .clicked()
-        {
-            picker.selection.clear();
-        }
-        if ui
-            .add_enabled(
                 preview.is_some() || active.get().is_some(),
-                egui::Button::new("Fit to Region"),
+                egui::Button::new("Fit Region"),
             )
             .clicked()
         {
             picker.view.fit_requested = true;
         }
-    });
-    ui.horizontal_wrapped(|ui| {
         if ui
             .add_enabled(
                 active.get().is_some() && preview.is_none() && !import.loading(),
@@ -182,6 +145,36 @@ fn region_details(
             return_open = true;
         }
         ui.menu_button("More…", |ui| {
+            if ui.button("Clear Selection").clicked() {
+                picker.selection.clear();
+                ui.close();
+            }
+            if ui.button("Import Existing Package…").clicked() {
+                if scene.data.is_some()
+                    && scene.revision == active.get().map(|(revision, _)| revision)
+                {
+                    import.builder.cancel();
+                }
+                satellite.start(active, scene, None);
+                ui.close();
+            }
+            if ui.button("Browse Existing Packages…").clicked() {
+                satellite.packages.open = true;
+                ui.close();
+            }
+            if let Some(b) = preview.or_else(|| active.get().map(|(_, r)| r.bounds)) {
+                ui.collapsing("Region details", |ui| {
+                    let center = b.center();
+                    ui.label(format!(
+                        "Center {:.6}°, {:.6}°",
+                        center.latitude, center.longitude
+                    ));
+                    ui.label(format!(
+                        "N {:.6}° · S {:.6}° · W {:.6}° · E {:.6}°",
+                        b.north, b.south, b.west, b.east
+                    ));
+                });
+            }
             if ui.button("Import DEM…").clicked() {
                 import.start(active, None, scene.fingerprint());
             }

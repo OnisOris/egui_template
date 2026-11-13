@@ -115,7 +115,7 @@ fn explorer_does_not_report_previous_region_terrain_as_ready() {
     region.bounds.east += 1.0;
     let mut project = Project::default();
     project.document.map_region = Some(region);
-    let real = RealScene {
+    let mut real = RealScene {
         data: Some(data),
         revision: Some(1),
         ..Default::default()
@@ -124,18 +124,18 @@ fn explorer_does_not_report_previous_region_terrain_as_ready() {
     let mut state = crate::ui::project_explorer::ExplorerState::default();
     let import = TerrainImport::default();
     let mut harness = Harness::new_ui(|ui| {
-        crate::ui::project_explorer::show(ui, &mut state, &mut project, &mut io, &real, &import)
+        crate::ui::project_explorer::show(ui, &mut state, &mut project, &mut io, &mut real, &import)
     });
     harness.run_ok();
     assert!(
         harness
-            .query_all_by_label("● Terrain · Previous region")
+            .query_all_by_label("Terrain · Previous region")
             .next()
             .is_some()
     );
     assert!(
         harness
-            .query_all_by_label("● Terrain · Ready")
+            .query_all_by_label("Terrain · Ready")
             .next()
             .is_none()
     );

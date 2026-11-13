@@ -49,17 +49,10 @@ pub fn build(
                 };
                 b.node(
                     NodeBuilder::leaf(Node::Layer(kind))
-                        .icon(move |ui| {
-                            ui.label(match kind {
-                                LayerKind::Terrain => "▧",
-                                LayerKind::Satellite => "▤",
-                                LayerKind::Roads => "≋",
-                                LayerKind::Buildings => "⌂",
-                            });
-                        })
+                        .icon(move |ui| layer_icon(ui, kind))
                         .label(format!(
-                            "{} {kind:?} · {status}",
-                            if layer.visible { "●" } else { "○" }
+                            "{kind:?} · {status}{}",
+                            if layer.visible { "" } else { " [hidden]" }
                         )),
                 );
             }
@@ -96,4 +89,44 @@ pub fn build(
         b.close_dir();
     }
     b.close_dir();
+}
+
+fn layer_icon(ui: &mut bevy_egui::egui::Ui, kind: LayerKind) {
+    use bevy_egui::egui::{self, pos2, vec2};
+    let (rect, response) = ui.allocate_exact_size(vec2(14., 14.), egui::Sense::hover());
+    let p = rect.min;
+    let stroke = egui::Stroke::new(1.2, ui.visuals().text_color());
+    let line = |a: [f32; 2], b: [f32; 2]| {
+        ui.painter()
+            .line_segment([p + vec2(a[0], a[1]), p + vec2(b[0], b[1])], stroke);
+    };
+    match kind {
+        LayerKind::Terrain => {
+            line([0., 12.], [5., 2.]);
+            line([5., 2.], [9., 9.]);
+            line([9., 9.], [12., 5.]);
+            line([12., 5.], [14., 12.]);
+        }
+        LayerKind::Roads => {
+            line([4., 0.], [4., 14.]);
+            line([10., 0.], [10., 14.]);
+        }
+        LayerKind::Buildings => {
+            for (x, h) in [(1., 8.), (8., 12.)] {
+                ui.painter().rect_stroke(
+                    egui::Rect::from_min_size(pos2(p.x + x, p.y + 14. - h), vec2(5., h)),
+                    0.,
+                    stroke,
+                    egui::StrokeKind::Inside,
+                );
+            }
+        }
+        LayerKind::Satellite => {
+            ui.painter()
+                .rect_stroke(rect, 0., stroke, egui::StrokeKind::Inside);
+            line([0., 7.], [14., 7.]);
+            line([7., 0.], [7., 14.]);
+        }
+    }
+    response.on_hover_text(format!("{kind:?} layer"));
 }

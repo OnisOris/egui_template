@@ -55,7 +55,7 @@ fn explorer_and_virtual_table_select_the_same_document_markers() {
                     &mut state.2,
                     &mut state.0,
                     &mut state.1,
-                    &state.4,
+                    &mut state.4,
                     &state.5,
                 );
                 project_table::show(&mut columns[1], &mut state.0, &mut state.3);

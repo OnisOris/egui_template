@@ -57,9 +57,10 @@ pub fn show(
     state: &mut ExplorerState,
     project: &mut Project,
     io: &mut ProjectIo,
-    real: &crate::map::real_scene::RealScene,
+    real: &mut crate::map::real_scene::RealScene,
     import: &crate::map::loading::TerrainImport,
 ) {
+    let satellite_before = project.document.layer(LayerKind::Satellite).visible;
     if state.generation != io.generation {
         state.generation = io.generation;
         state.remove_asset = None;
@@ -82,7 +83,7 @@ pub fn show(
             if ui.button("Import…").clicked() {
                 io.request(ProjectAction::Import, project);
             }
-            ui.menu_button("⋯", |ui| {
+            ui.menu_button("More", |ui| {
                 for (label, action) in [
                     ("Refresh", ProjectAction::Refresh),
                     ("Open Project…", ProjectAction::Open),
@@ -180,6 +181,10 @@ pub fn show(
         let layer = project.document.layer_mut(kind);
         layer.visible = !layer.visible;
         project.changed();
+    }
+    if satellite_before != project.document.layer(LayerKind::Satellite).visible {
+        real.satellite_enabled =
+            project.document.layer(LayerKind::Satellite).visible && real.satellite.is_some();
     }
     state.last_selection = Some(project.selection.clone());
 }

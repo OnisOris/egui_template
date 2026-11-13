@@ -6,16 +6,17 @@ use bevy_egui::{EguiContexts, egui};
 use starter_core::Command;
 
 use crate::state::DocumentResource;
-use starter_ui::Theme;
 
 use crate::{
     metrics::EditorMetrics,
-    scene::objects::{bounds, object_center},
     state::{EditorAction, UiState},
     viewport::{self, ViewportCamera, ViewportState},
 };
 
+mod actions;
 mod appearance;
+mod shortcuts;
+use actions::apply;
 pub mod chrome;
 mod diagnostics;
 mod empty_states;
@@ -88,7 +89,7 @@ pub(crate) fn editor_ui(
                 .layer_id(egui::LayerId::background())
                 .max_rect(ctx.viewport_rect()),
         );
-        if project_io.busy() || project_io.prompt.is_some() {
+        if project_io.busy() || project_io.prompt.is_some() || project_io.error.is_some() {
             root.disable();
         }
         let UiState {
@@ -110,17 +111,19 @@ pub(crate) fn editor_ui(
             &mut root,
             workspace,
             (&document, &project, project_io.benchmark),
-            &metrics,
+            import.loading()
+                || import.builder.loading
+                || satellite.loading()
+                || real.vector_status.contains("Loading")
+                || real.vector_status.contains("Building geometry"),
             projection,
             &mut viewport.camera.sensitivity,
             notice.as_deref(),
         );
-        if !project_io.busy()
-            && project_io.prompt.is_none()
-            && ctx.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::S))
-        {
-            actions.push(EditorAction::Save);
-        }
+        actions.extend(shortcuts::collect(
+            ctx,
+            project_io.busy() || project_io.prompt.is_some() || project_io.error.is_some(),
+        ));
         let (panel_commands, panel_actions) = panels::show(
             &mut root,
             panels::Panels {
@@ -162,6 +165,10 @@ pub(crate) fn editor_ui(
         dispatch(&mut document, &mut ui_state.notice, command);
     }
     for action in actions {
+        if matches!(action, EditorAction::CancelTool) {
+            picker.selection.clear();
+            picker.view.tool = crate::map::picker::Tool::Pan;
+        }
         if matches!(action, EditorAction::LoadRegion) {
             crate::map::ui::load_in_3d(&active, &mut runtime, &mut import);
             continue;
@@ -197,115 +204,6 @@ pub(crate) fn editor_ui(
     );
     metrics.ui_ms = started.elapsed().as_secs_f32() * 1000.0;
     Ok(())
-}
-
-fn apply(
-    action: EditorAction,
-    ui_state: &mut UiState,
-    document: &mut DocumentResource,
-    viewport: &mut ViewportState,
-    runtime: &mut crate::map::RegionRuntime,
-    project: &mut crate::project::Project,
-    io: &mut crate::project::ProjectIo,
-) {
-    if runtime.mode != crate::map::SceneMode::Editor
-        && (io.benchmark || matches!(action, EditorAction::ResetView))
-        && matches!(
-            action,
-            EditorAction::ResetView | EditorAction::FocusSelection
-        )
-    {
-        crate::viewport::focus_geo(viewport);
-        return;
-    }
-    if matches!(action, EditorAction::SetLoad(_)) {
-        if !io.benchmark {
-            io.return_mode = runtime.mode;
-        }
-        runtime.mode = crate::map::SceneMode::Editor;
-    }
-    match action {
-        EditorAction::New
-        | EditorAction::Open
-        | EditorAction::Save
-        | EditorAction::SaveAs
-        | EditorAction::ImportAsset
-        | EditorAction::Exit => {
-            use crate::project::ProjectAction as A;
-            let action = match action {
-                EditorAction::New => A::New,
-                EditorAction::Open => A::Open,
-                EditorAction::Save => A::Save,
-                EditorAction::SaveAs => A::SaveAs,
-                EditorAction::ImportAsset => A::Import,
-                _ => A::Exit,
-            };
-            io.request(action, project);
-        }
-        EditorAction::MapSources | EditorAction::LoadRegion => {}
-        EditorAction::SelectRegion => {
-            ui_state.workspace.ensure_panel(starter_ui::PanelId::Map);
-            ui_state.workspace.activate(starter_ui::PanelId::Map);
-        }
-        EditorAction::Diagnostics => ui_state.diagnostics = !ui_state.diagnostics,
-        EditorAction::Appearance => ui_state.appearance_open = true,
-        EditorAction::Select => {
-            project.placing_marker = false;
-            project.placing_model = None;
-        }
-        EditorAction::ExitDemo => {
-            io.benchmark = false;
-            dispatch(document, &mut ui_state.notice, Command::NewDocument);
-            runtime.mode = io.return_mode;
-            crate::viewport::focus_geo(viewport);
-        }
-        EditorAction::AddObject => {
-            if io.benchmark {
-                return;
-            }
-            project.placing_model = None;
-            project.placing_marker = true;
-            ui_state.workspace.ensure_panel(starter_ui::PanelId::Map);
-            ui_state.workspace.activate(starter_ui::PanelId::Map);
-        }
-        EditorAction::DeleteSelection => {
-            if io.benchmark {
-                dispatch(document, &mut ui_state.notice, Command::DeleteSelection);
-            } else {
-                project.delete_selected();
-            }
-        }
-        EditorAction::FocusSelection if !io.benchmark => {
-            project.focus_selected = true;
-        }
-        EditorAction::FocusSelection => {
-            if let Some(object) = document.selected_object() {
-                viewport.camera.focus(object_center(object));
-            }
-        }
-        EditorAction::ResetView => viewport.camera.reset(bounds(document)),
-        EditorAction::ResetLayout => {
-            ui_state.workspace.reset();
-            ui_state.workspace.ensure_panel(starter_ui::PanelId::Map);
-        }
-        EditorAction::ToggleProjection => viewport.camera.projection.toggle(),
-        EditorAction::ToggleTheme => {
-            ui_state.theme = match ui_state.theme {
-                Theme::Dark => Theme::Light,
-                Theme::Light => Theme::Dark,
-            };
-        }
-        EditorAction::SetLoad(size) => {
-            io.benchmark = true;
-            project.placing_marker = false;
-            ui_state
-                .workspace
-                .ensure_panel(starter_ui::PanelId::Viewport);
-            ui_state.workspace.activate(starter_ui::PanelId::Viewport);
-            dispatch(document, &mut ui_state.notice, Command::LoadTestScene(size));
-            viewport.camera.reset(bounds(document));
-        }
-    }
 }
 
 fn dispatch(document: &mut DocumentResource, notice: &mut Option<String>, command: Command) {

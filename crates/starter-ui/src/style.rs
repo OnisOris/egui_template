@@ -46,10 +46,12 @@ impl Appearance {
         if ctx.data(|d| d.get_temp::<(Theme, Density, f32)>(key)) == Some(current) {
             return;
         }
-        let mut style = egui::Style::default();
-        style.visuals = match theme {
-            Theme::Dark => Visuals::dark(),
-            Theme::Light => Visuals::light(),
+        let mut style = egui::Style {
+            visuals: match theme {
+                Theme::Dark => Visuals::dark(),
+                Theme::Light => Visuals::light(),
+            },
+            ..Default::default()
         };
         let v = &mut style.visuals;
         if theme == Theme::Dark {
@@ -121,6 +123,16 @@ impl Appearance {
     }
 }
 
+/// A standard collapsible property group, shared by all Inspector selections.
+pub fn section(ui: &mut egui::Ui, title: &str, draw: impl FnOnce(&mut egui::Ui)) {
+    egui::CollapsingHeader::new(title)
+        .default_open(true)
+        .show(ui, |ui| {
+            ui.set_min_width(0.);
+            draw(ui);
+        });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -146,14 +158,4 @@ mod tests {
             Appearance::default()
         );
     }
-}
-
-/// A standard collapsible property group, shared by all Inspector selections.
-pub fn section(ui: &mut egui::Ui, title: &str, draw: impl FnOnce(&mut egui::Ui)) {
-    egui::CollapsingHeader::new(title)
-        .default_open(true)
-        .show(ui, |ui| {
-            ui.set_min_width(0.);
-            draw(ui);
-        });
 }

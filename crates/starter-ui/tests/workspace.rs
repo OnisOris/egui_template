@@ -95,3 +95,27 @@ fn dragging_splitter_resizes_panes() {
     harness.run();
     assert!(harness.state().1.width() > before.width() + 50.0);
 }
+
+#[test]
+fn presets_roundtrip_restore_hidden_panels_and_accept_legacy_layouts() {
+    use starter_ui::WorkspacePreset;
+    for preset in WorkspacePreset::ALL {
+        let mut w = Workspace::preset(preset);
+        assert_eq!(w.selected_preset(), Some(preset));
+        assert!(!w.is_visible(PanelId::Components));
+        assert!(w.is_visible(PanelId::Viewport) && w.is_visible(PanelId::Map));
+        if preset == WorkspacePreset::Analysis {
+            assert!(w.is_visible(PanelId::Charts) && w.is_visible(PanelId::DataTable));
+        }
+        w.set_visible(PanelId::Inspector, false);
+        let restored: Workspace =
+            serde_json::from_str(&serde_json::to_string(&w).unwrap()).unwrap();
+        assert_eq!(w, restored);
+        w.activate(PanelId::Inspector);
+        assert!(w.is_visible(PanelId::Inspector));
+    }
+    let mut legacy = serde_json::to_value(Workspace::default()).unwrap();
+    legacy.as_object_mut().unwrap().remove("preset");
+    let restored: Workspace = serde_json::from_value(legacy).unwrap();
+    assert_eq!(restored, Workspace::default());
+}

@@ -100,7 +100,7 @@ fn place_on_map_remains_clickable_below_a_scrolling_explorer() {
                 explorer,
                 project,
                 io,
-                &crate::map::real_scene::RealScene::default(),
+                &mut crate::map::real_scene::RealScene::default(),
                 &crate::map::loading::TerrainImport::default(),
             );
         },

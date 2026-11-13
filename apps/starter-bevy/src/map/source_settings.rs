@@ -10,6 +10,8 @@ pub fn show(ui: &mut Ui, view: &mut ImageryView) {
     egui::Window::new("Map Sources")
         .open(&mut open)
         .default_width(580.0)
+        .max_height(620.0)
+        .vscroll(true)
         .show(ui.ctx(), |ui| {
             let settings = view.settings.get_or_insert_with(Default::default);
             ui.horizontal(|ui| {

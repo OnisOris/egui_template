@@ -18,4 +18,4 @@ pub use explorer_panel::{ExplorerNodeId, show as show_explorer};
 pub use inspector::{InspectorState, show as show_inspector};
 pub use table::show_table;
 pub use theme::Theme;
-pub use workspace::{PanelId, Workspace};
+pub use workspace::{PanelId, Workspace, WorkspacePreset};

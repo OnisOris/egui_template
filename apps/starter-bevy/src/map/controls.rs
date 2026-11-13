@@ -103,7 +103,7 @@ pub fn viewport_bar(
             focus_geo(viewport);
             (viewport.camera.yaw, viewport.camera.pitch) = orbit;
         }
-        ui.menu_button("⋯", |ui| {
+        ui.menu_button("More", |ui| {
             if ui.button("Import DEM…").clicked() {
                 import.start(active, None, scene.fingerprint());
                 ui.close();

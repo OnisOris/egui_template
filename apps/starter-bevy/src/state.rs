@@ -54,24 +54,18 @@ pub struct UiState {
 
 impl Default for UiState {
     fn default() -> Self {
+        let preferences = crate::layout::preferences();
         Self {
             workspace: {
-                let mut workspace = crate::layout::load().unwrap_or_else(|| {
-                    let mut workspace = Workspace::default();
-                    workspace.ensure_panel(starter_ui::PanelId::Map);
-                    workspace.set_visible(starter_ui::PanelId::Components, false);
-                    workspace.set_visible(starter_ui::PanelId::Charts, false);
-                    workspace.set_visible(starter_ui::PanelId::DataTable, false);
-                    workspace.activate(starter_ui::PanelId::Viewport);
-                    workspace
-                });
+                let mut workspace = crate::layout::load()
+                    .unwrap_or_else(|| Workspace::preset(starter_ui::WorkspacePreset::Scene));
                 workspace.ensure_panel(starter_ui::PanelId::Map);
                 workspace
             },
-            theme: Theme::Dark,
+            theme: preferences.theme,
             diagnostics: false,
             appearance_open: false,
-            appearance: Default::default(),
+            appearance: preferences.appearance,
             explorer: ExplorerTree::default(),
             inspector: InspectorState::default(),
             table: TableState::default(),
@@ -104,6 +98,7 @@ pub enum EditorAction {
     Diagnostics,
     Appearance,
     Select,
+    CancelTool,
     SelectRegion,
     LoadRegion,
     SetLoad(usize),

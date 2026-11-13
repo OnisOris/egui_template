@@ -1,4 +1,4 @@
-use crate::{metrics::EditorMetrics, state::EditorAction, viewport::ProjectionMode};
+use crate::{state::EditorAction, viewport::ProjectionMode};
 use bevy_egui::egui::{self, Ui};
 use starter_core::{DocumentState, TEST_LOADS};
 use starter_ui::{PanelId, Workspace};
@@ -7,7 +7,7 @@ pub fn show(
     ui: &mut Ui,
     workspace: &mut Workspace,
     session: (&DocumentState, &starter_core::ProjectState, bool),
-    _metrics: &EditorMetrics,
+    background: bool,
     projection: ProjectionMode,
     sensitivity: &mut f32,
     notice: Option<&str>,
@@ -44,6 +44,20 @@ pub fn show(
                 );
             });
             ui.menu_button("View", |ui| {
+                ui.menu_button("Workspace", |ui| {
+                    for preset in starter_ui::WorkspacePreset::ALL {
+                        if ui
+                            .selectable_label(
+                                workspace.selected_preset() == Some(preset),
+                                preset.title(),
+                            )
+                            .clicked()
+                        {
+                            *workspace = Workspace::preset(preset);
+                            ui.close();
+                        }
+                    }
+                });
                 ui.menu_button("Panels", |ui| {
                     for panel in PanelId::ALL
                         .into_iter()
@@ -110,7 +124,7 @@ pub fn show(
             });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if project.dirty {
-                    ui.colored_label(starter_ui::style::WARNING, "●")
+                    ui.colored_label(starter_ui::style::WARNING, "Unsaved")
                         .on_hover_text("Unsaved changes");
                 }
                 ui.label(&project.document.name);
@@ -128,7 +142,7 @@ pub fn show(
                     &mut actions,
                 );
             } else {
-                ui.menu_button("＋ Add Object", |ui| {
+                ui.menu_button("Add Object", |ui| {
                     command(ui, "Map Marker", EditorAction::AddObject, &mut actions);
                     command(ui, "Import Model…", EditorAction::ImportAsset, &mut actions);
                 })
@@ -147,14 +161,12 @@ pub fn show(
                 command(ui, "Focus", EditorAction::FocusSelection, &mut actions);
             }
             ui.separator();
-            for (panel, label) in [
-                (PanelId::Map, "Map"),
-                (PanelId::Viewport, "3D"),
-                (PanelId::Charts, "Analysis"),
-            ] {
-                if ui.button(label).clicked() {
-                    workspace.ensure_panel(panel);
-                    workspace.activate(panel);
+            for preset in starter_ui::WorkspacePreset::ALL {
+                if ui
+                    .selectable_label(workspace.selected_preset() == Some(preset), preset.title())
+                    .clicked()
+                {
+                    *workspace = Workspace::preset(preset);
                 }
             }
         });
@@ -163,6 +175,9 @@ pub fn show(
         ui.horizontal_wrapped(|ui| {
             if let Some(notice) = notice {
                 ui.colored_label(ui.visuals().error_fg_color, notice);
+            } else if background {
+                ui.spinner();
+                ui.label("Loading geographic data…");
             } else {
                 ui.colored_label(starter_ui::style::SUCCESS, "Ready");
             }

@@ -37,9 +37,28 @@ impl PanelId {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum WorkspacePreset {
+    MapEditing,
+    Scene,
+    Analysis,
+}
+impl WorkspacePreset {
+    pub const ALL: [Self; 3] = [Self::MapEditing, Self::Scene, Self::Analysis];
+    pub fn title(self) -> &'static str {
+        match self {
+            Self::MapEditing => "Map Editing",
+            Self::Scene => "3D Scene",
+            Self::Analysis => "Analysis",
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Workspace {
     tree: Tree<PanelId>,
+    #[serde(default)]
+    preset: Option<WorkspacePreset>,
 }
 
 impl Default for Workspace {
@@ -67,7 +86,45 @@ impl Workspace {
         }
         Self {
             tree: Tree::new(Id::new("starter_workspace"), root, tiles),
+            preset: None,
         }
+    }
+
+    pub fn preset(preset: WorkspacePreset) -> Self {
+        let mut tiles = Tiles::default();
+        let explorer = tiles.insert_pane(PanelId::Explorer);
+        let inspector = tiles.insert_pane(PanelId::Inspector);
+        let viewport = tiles.insert_pane(PanelId::Viewport);
+        let map = tiles.insert_pane(PanelId::Map);
+        let center = if preset == WorkspacePreset::Analysis {
+            let charts = tiles.insert_pane(PanelId::Charts);
+            let table = tiles.insert_pane(PanelId::DataTable);
+            let analysis = tiles.insert_tab_tile(vec![charts, table]);
+            let view = tiles.insert_tab_tile(vec![viewport, map]);
+            tiles.insert_vertical_tile(vec![view, analysis])
+        } else {
+            tiles.insert_tab_tile(vec![viewport, map])
+        };
+        let root = tiles.insert_horizontal_tile(vec![explorer, center, inspector]);
+        if let Some(Tile::Container(Container::Linear(Linear { shares, .. }))) = tiles.get_mut(root)
+        {
+            shares.set_share(explorer, 0.17);
+            shares.set_share(center, 0.61);
+            shares.set_share(inspector, 0.22);
+        }
+        let mut workspace = Self {
+            tree: Tree::new(Id::new("starter_workspace"), root, tiles),
+            preset: Some(preset),
+        };
+        workspace.activate(if preset == WorkspacePreset::MapEditing {
+            PanelId::Map
+        } else {
+            PanelId::Viewport
+        });
+        workspace
+    }
+    pub fn selected_preset(&self) -> Option<WorkspacePreset> {
+        self.preset
     }
 
     /// Add an optional application panel without changing the desktop default layout.

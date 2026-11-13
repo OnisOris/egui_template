@@ -39,7 +39,9 @@ pub fn show(
                         .map(|p| p.display().to_string())
                         .unwrap_or("Not saved to disk".into()),
                 );
-                ui.label(if project.dirty {
+                ui.label(if io.path.is_none() {
+                    "New project"
+                } else if project.dirty {
                     "Unsaved changes"
                 } else {
                     "Saved"
