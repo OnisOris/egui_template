@@ -154,6 +154,10 @@ where
         6.0
     }
 
+    fn tab_bar_height(&self, style: &egui::Style) -> f32 {
+        style.spacing.interact_size.y + 4.0
+    }
+
     fn tab_title_for_pane(&mut self, pane: &PanelId) -> WidgetText {
         pane.title().into()
     }
@@ -162,7 +166,10 @@ where
         // Panes are surfaces: without this the window clear color shows through.
         ui.painter()
             .rect_filled(ui.max_rect(), 0.0, ui.visuals().panel_fill);
-        (self.draw)(ui, *pane);
+        let rect = ui.max_rect().shrink(10.0);
+        ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+            (self.draw)(ui, *pane);
+        });
         UiResponse::None
     }
 

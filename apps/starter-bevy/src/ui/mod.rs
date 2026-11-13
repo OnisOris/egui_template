@@ -100,9 +100,7 @@ pub(crate) fn editor_ui(
             marker_table,
             project_inspector,
         } = &mut *ui_state;
-        if ctx.global_style().visuals.dark_mode != matches!(theme, Theme::Dark) {
-            theme.apply(ctx);
-        }
+        theme.apply(ctx);
         actions = chrome::show(
             &mut root,
             workspace,

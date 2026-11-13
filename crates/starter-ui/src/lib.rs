@@ -3,6 +3,7 @@ mod data_table;
 mod explorer;
 mod explorer_panel;
 mod inspector;
+pub mod style;
 mod table;
 mod theme;
 mod workspace;

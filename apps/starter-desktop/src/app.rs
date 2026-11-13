@@ -186,9 +186,7 @@ impl eframe::App for StarterApp {
         self.poll_files();
         self.shortcuts(&ctx);
         self.top_ui(ui, &ctx);
-        if ui.visuals().dark_mode != matches!(self.ui_state.theme, Theme::Dark) {
-            self.ui_state.theme.apply(&ctx);
-        }
+        self.ui_state.theme.apply(&ctx);
         let continuous = self.ui_state.continuous_repaint;
         workspace::status(
             ui,

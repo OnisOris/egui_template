@@ -1,4 +1,4 @@
-use egui::{Context, Visuals};
+use egui::Context;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -10,9 +10,6 @@ pub enum Theme {
 
 impl Theme {
     pub fn apply(self, context: &Context) {
-        context.set_visuals(match self {
-            Self::Light => Visuals::light(),
-            Self::Dark => Visuals::dark(),
-        });
+        crate::style::Appearance::default().apply(context, self);
     }
 }
