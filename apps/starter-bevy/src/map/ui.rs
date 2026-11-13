@@ -191,6 +191,7 @@ fn region_details(
             } else {
                 import.start_automatic(active);
             }
+            runtime.vector_requested = true;
             return_open = true;
         }
         ui.menu_button("More…", |ui| {
@@ -206,6 +207,7 @@ fn region_details(
                     Ok(()) => {
                         import.builder.cancel();
                         runtime.open_requested = true;
+                        runtime.vector_requested = true;
                         return_open = true;
                     }
                     Err(error) => picker.selection.error = Some(error.into()),

@@ -38,3 +38,18 @@ trailing binary data and elevation draping. No public server is used by tests.
 
 GPU upload completion is not inferred from CPU asset insertion time. Native GUI
 validation, source comparisons and measured timings will be recorded separately.
+
+Stage b reads OpenFreeMap TileJSON before planning z12–14 coverage (at most 64
+source tiles). It resolves metadata templates, extracts only building and
+transportation, excludes tunnels, clips to the selected bbox, removes duplicate
+clipped geometry and validates the result. The processed cache is keyed by source
+and exact region; binary content hashes detect corruption. The existing downloader
+limits parallel HTTP requests to four and each response to 8 MiB.
+
+Vector downloads are independent background tasks and can finish before DEM.
+Geometry waits for a matching terrain fingerprint; obsolete region/task handles
+are discarded and cancellation stops subsequent requests. An error in vectors
+does not clear the DEM, satellite imagery, GLB assets or project markers.
+An authored 125-byte MVT fixture and local HTTP TileJSON server test automatic
+loading, real MVT decoding, source height, cache reuse, cancellation and coverage
+limits without contacting OpenFreeMap in CI.

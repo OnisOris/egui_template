@@ -38,6 +38,7 @@ pub struct RegionRuntime {
     pub open_requested: bool,
     pub mode: SceneMode,
     pub real_requested: bool,
+    pub vector_requested: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
