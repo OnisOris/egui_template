@@ -51,7 +51,11 @@ pub fn build(b: &mut TreeViewBuilder<'_, Node>, project: &Project, io: &ProjectI
                     Node::Layer(kind),
                     format!(
                         "{kind:?} · {}",
-                        layer.package_id.as_deref().unwrap_or("not loaded")
+                        if layer.package_id.is_some() {
+                            "Cached"
+                        } else {
+                            "Not loaded"
+                        }
                     ),
                 );
             }

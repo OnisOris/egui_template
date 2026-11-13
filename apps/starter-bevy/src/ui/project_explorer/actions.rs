@@ -3,6 +3,14 @@ use crate::project::{Project, ProjectAction, ProjectIo};
 use bevy_egui::egui::{self, Ui};
 use starter_core::ProjectSelection;
 pub fn show(ui: &mut Ui, state: &mut ExplorerState, project: &mut Project, io: &mut ProjectIo) {
+    if let ProjectSelection::Layer(kind) = project.selection {
+        let mut visible = project.document.layer(kind).visible;
+        if ui.checkbox(&mut visible, "Visible").changed() {
+            project.document.layer_mut(kind).visible = visible;
+            project.changed();
+        }
+        ui.small("Source and properties in Inspector");
+    }
     if let ProjectSelection::Marker(id) | ProjectSelection::Model(id) = project.selection {
         ui.horizontal_wrapped(|ui| {
             if ui.small_button("Focus").clicked() {

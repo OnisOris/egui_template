@@ -4,7 +4,7 @@ use crate::{
     project::Project,
 };
 use starter_core::LayerKind;
-use starter_ui::TreeViewBuilder;
+use starter_ui::{NodeBuilder, TreeViewBuilder};
 pub fn build(
     b: &mut TreeViewBuilder<'_, Node>,
     project: &Project,
@@ -47,12 +47,20 @@ pub fn build(
                 } else {
                     "Not loaded"
                 };
-                b.leaf(
-                    Node::Layer(kind),
-                    format!(
-                        "{} {kind:?} · {status}",
-                        if layer.visible { "●" } else { "○" }
-                    ),
+                b.node(
+                    NodeBuilder::leaf(Node::Layer(kind))
+                        .icon(move |ui| {
+                            ui.label(match kind {
+                                LayerKind::Terrain => "▧",
+                                LayerKind::Satellite => "▤",
+                                LayerKind::Roads => "≋",
+                                LayerKind::Buildings => "⌂",
+                            });
+                        })
+                        .label(format!(
+                            "{} {kind:?} · {status}",
+                            if layer.visible { "●" } else { "○" }
+                        )),
                 );
             }
         }

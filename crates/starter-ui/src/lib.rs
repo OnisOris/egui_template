@@ -10,7 +10,7 @@ mod workspace;
 
 pub use chart::line_chart;
 pub use data_table::{TableSort, TableState, show as show_data_table};
-pub use egui_ltreeview::{Action, TreeViewBuilder};
+pub use egui_ltreeview::{Action, NodeBuilder, TreeViewBuilder};
 pub use egui_plot::{Legend, Line, Plot, PlotPoint, PlotPoints};
 pub use egui_table::{AutoSizeMode, CellInfo, Column, HeaderCellInfo, HeaderRow, TableDelegate};
 pub use explorer::ExplorerTree;

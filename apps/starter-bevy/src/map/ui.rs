@@ -178,16 +178,7 @@ fn region_details(
             )
             .clicked()
         {
-            if import.prepared.as_ref().is_some_and(|p| {
-                active
-                    .get()
-                    .is_some_and(|(_, r)| p.data.manifest.matches(r))
-            }) {
-                runtime.real_requested = true;
-            } else {
-                import.start_automatic(active);
-            }
-            runtime.vector_requested = true;
+            load_in_3d(active, runtime, import);
             return_open = true;
         }
         ui.menu_button("More…", |ui| {
@@ -231,4 +222,24 @@ fn region_details(
         ui.colored_label(ui.visuals().error_fg_color, error);
     }
     return_open
+}
+
+pub(crate) fn load_in_3d(
+    active: &ActiveMapRegion,
+    runtime: &mut RegionRuntime,
+    import: &mut super::loading::TerrainImport,
+) {
+    if active.get().is_none() || import.loading() {
+        return;
+    }
+    if import.prepared.as_ref().is_some_and(|p| {
+        active
+            .get()
+            .is_some_and(|(_, r)| p.data.manifest.matches(r))
+    }) {
+        runtime.real_requested = true;
+    } else {
+        import.start_automatic(active);
+    }
+    runtime.vector_requested = true;
 }

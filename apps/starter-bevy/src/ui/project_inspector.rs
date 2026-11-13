@@ -4,6 +4,7 @@ use crate::{
 };
 use bevy_egui::egui::{self, Ui};
 use starter_core::{LayerKind, ProjectSelection};
+use starter_ui::style::section;
 
 pub use super::project_names::InspectorState;
 
@@ -23,22 +24,26 @@ pub fn show(
     match project.selection.clone() {
         ProjectSelection::Project => {
             ui.strong("Project");
-            if let Some(name) = inspector.name(ui, &project.selection, &project.document.name)
-                && name != project.document.name
-            {
-                project.document.name = name;
-                project.changed();
-            }
-            ui.label(
-                io.path
-                    .as_ref()
-                    .map(|p| p.display().to_string())
-                    .unwrap_or("Not saved to disk".into()),
-            );
-            ui.label(if project.dirty {
-                "Unsaved changes"
-            } else {
-                "Saved"
+            section(ui, "General", |ui| {
+                if let Some(name) = inspector.name(ui, &project.selection, &project.document.name)
+                    && name != project.document.name
+                {
+                    project.document.name = name;
+                    project.changed();
+                }
+            });
+            section(ui, "Location", |ui| {
+                ui.label(
+                    io.path
+                        .as_ref()
+                        .map(|p| p.display().to_string())
+                        .unwrap_or("Not saved to disk".into()),
+                );
+                ui.label(if project.dirty {
+                    "Unsaved changes"
+                } else {
+                    "Saved"
+                });
             });
         }
         ProjectSelection::Model(id) => {
@@ -81,9 +86,12 @@ pub fn show(
                     real.satellite_enabled = visible && real.satellite.is_some();
                 }
             }
-            match kind {
+            section(ui, "Source & Status", |ui| match kind {
                 LayerKind::Roads | LayerKind::Buildings => {
                     ui.label(&real.vector_status);
+                    if ui.button("Import Vectors…").clicked() {
+                        real.vector_import_requested = true;
+                    }
                     if project.document.geo_view_mode == starter_core::GeoViewMode::Terrain {
                         ui.small("Hidden in Terrain mode · use City or Combined");
                     }
@@ -116,7 +124,13 @@ pub fn show(
                             "Step {:.2} × {:.2} m",
                             m.spacing_x_m, m.spacing_y_m
                         ));
-                        ui.label(&m.reference_elevation_source);
+                        ui.label(format!(
+                            "Reference {:.2} m MSL · {}",
+                            m.reference_elevation_msl, m.reference_elevation_source
+                        ));
+                        ui.collapsing("Package details", |ui| {
+                            ui.label(&m.terrain_id);
+                        });
                         ui.label(&m.attribution);
                     } else {
                         ui.label("No DEM loaded · select region and Load in 3D");
@@ -135,28 +149,50 @@ pub fn show(
                         ui.label("Satellite not loaded");
                     }
                 }
-            }
+            });
         }
         ProjectSelection::Marker(id) => {
             if let Some(marker) = project.document.objects.iter().find(|m| m.id == id) {
                 let mut marker = marker.clone();
                 let before = marker.clone();
-                ui.strong(format!("Map Marker · {}", id.0));
-                if let Some(name) = inspector.name(ui, &project.selection, &marker.name) {
-                    marker.name = name;
-                }
-                for (label, value) in [
-                    ("Latitude", &mut marker.latitude),
-                    ("Longitude", &mut marker.longitude),
-                    ("Altitude AGL (m)", &mut marker.altitude_agl),
-                ] {
-                    ui.horizontal(|ui| {
-                        ui.label(label);
-                        ui.add(egui::DragValue::new(value).speed(0.0001).max_decimals(7));
-                    });
-                }
-                ui.checkbox(&mut marker.visible, "Visible");
-                ui.color_edit_button_srgba_unmultiplied(&mut marker.color);
+                ui.strong(&marker.name);
+                section(ui, "General", |ui| {
+                    if let Some(name) = inspector.name(ui, &project.selection, &marker.name) {
+                        marker.name = name;
+                    }
+                    ui.checkbox(&mut marker.visible, "Visible");
+                });
+                section(ui, "Geographic Position", |ui| {
+                    egui::Grid::new("marker_position")
+                        .num_columns(2)
+                        .show(ui, |ui| {
+                            for (label, value) in [
+                                ("Latitude", &mut marker.latitude),
+                                ("Longitude", &mut marker.longitude),
+                                ("Altitude AGL (m)", &mut marker.altitude_agl),
+                            ] {
+                                ui.label(label);
+                                ui.add(
+                                    egui::DragValue::new(value)
+                                        .speed(if label == "Altitude AGL (m)" {
+                                            0.1
+                                        } else {
+                                            0.0001
+                                        })
+                                        .max_decimals(7)
+                                        .suffix(if label == "Altitude AGL (m)" {
+                                            " m"
+                                        } else {
+                                            "°"
+                                        }),
+                                );
+                                ui.end_row();
+                            }
+                        });
+                });
+                section(ui, "Appearance", |ui| {
+                    ui.color_edit_button_srgba_unmultiplied(&mut marker.color);
+                });
                 if before != marker
                     && let Err(e) = project.edit_marker(marker.clone())
                 {

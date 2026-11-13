@@ -147,3 +147,13 @@ mod tests {
         );
     }
 }
+
+/// A standard collapsible property group, shared by all Inspector selections.
+pub fn section(ui: &mut egui::Ui, title: &str, draw: impl FnOnce(&mut egui::Ui)) {
+    egui::CollapsingHeader::new(title)
+        .default_open(true)
+        .show(ui, |ui| {
+            ui.set_min_width(0.);
+            draw(ui);
+        });
+}

@@ -79,18 +79,22 @@ pub fn show(
     });
     if state.files {
         ui.horizontal_wrapped(|ui| {
-            for (label, action) in [
-                ("New", ProjectAction::New),
-                ("Open…", ProjectAction::Open),
-                ("Save", ProjectAction::Save),
-                ("Save As…", ProjectAction::SaveAs),
-                ("Import…", ProjectAction::Import),
-                ("Refresh", ProjectAction::Refresh),
-            ] {
-                if ui.small_button(label).clicked() {
-                    io.request(action, project);
-                }
+            if ui.button("Import…").clicked() {
+                io.request(ProjectAction::Import, project);
             }
+            ui.menu_button("⋯", |ui| {
+                for (label, action) in [
+                    ("Refresh", ProjectAction::Refresh),
+                    ("Open Project…", ProjectAction::Open),
+                ] {
+                    if ui.button(label).clicked() {
+                        io.request(action, project);
+                        ui.close();
+                    }
+                }
+            })
+            .response
+            .on_hover_text("Resource actions");
         });
     }
     egui::Panel::bottom("project_explorer_actions").show(ui, |ui| {
@@ -121,6 +125,8 @@ pub fn show(
         rows
     };
     let height = (count as f32) * (ui.spacing().interact_size.y + ui.spacing().item_spacing.y);
+    let mut context_selection = None;
+    let mut toggle_layer = false;
     let actions = egui::ScrollArea::vertical()
         .id_salt("project_explorer_scroll")
         .auto_shrink([false, false])
@@ -130,15 +136,32 @@ pub fn show(
                 egui::vec2(ui.available_width(), height),
             );
             ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
-                state
-                    .tree
-                    .show(ui, ui.id().with("project_tree"), |builder| {
+                state.tree.show_with_context(
+                    ui,
+                    ui.id().with("project_tree"),
+                    |builder| {
                         if state.files {
                             files::build(builder, project, io);
                         } else {
                             scene::build(builder, project, real, import);
                         }
-                    })
+                    },
+                    |ui, nodes| {
+                        if let Some(node) = nodes.last() {
+                            if ui.button("Inspect").clicked() {
+                                context_selection = Some(node.selection());
+                                ui.close();
+                            }
+                            if matches!(node, Node::Layer(_))
+                                && ui.button("Show / Hide Layer").clicked()
+                            {
+                                context_selection = Some(node.selection());
+                                toggle_layer = true;
+                                ui.close();
+                            }
+                        }
+                    },
+                )
             })
             .inner
         })
@@ -149,6 +172,14 @@ pub fn show(
         {
             project.selection = node.selection();
         }
+    }
+    if let Some(selection) = context_selection {
+        project.selection = selection;
+    }
+    if toggle_layer && let ProjectSelection::Layer(kind) = project.selection {
+        let layer = project.document.layer_mut(kind);
+        layer.visible = !layer.visible;
+        project.changed();
     }
     state.last_selection = Some(project.selection.clone());
 }

@@ -18,6 +18,7 @@ use crate::{
 mod appearance;
 pub mod chrome;
 mod diagnostics;
+mod empty_states;
 pub mod gallery;
 mod model_inspector;
 pub mod panels;
@@ -120,7 +121,7 @@ pub(crate) fn editor_ui(
         {
             actions.push(EditorAction::Save);
         }
-        commands = panels::show(
+        let (panel_commands, panel_actions) = panels::show(
             &mut root,
             panels::Panels {
                 project: &mut project,
@@ -147,6 +148,8 @@ pub(crate) fn editor_ui(
                 notice,
             },
         );
+        commands = panel_commands;
+        actions.extend(panel_actions);
     }
 
     let viewport_drawn = viewport.requested_size.is_some();
@@ -159,6 +162,10 @@ pub(crate) fn editor_ui(
         dispatch(&mut document, &mut ui_state.notice, command);
     }
     for action in actions {
+        if matches!(action, EditorAction::LoadRegion) {
+            crate::map::ui::load_in_3d(&active, &mut runtime, &mut import);
+            continue;
+        }
         if matches!(action, EditorAction::MapSources) {
             picker.imagery.settings_open = true;
             continue;
@@ -235,7 +242,11 @@ fn apply(
             };
             io.request(action, project);
         }
-        EditorAction::MapSources => {}
+        EditorAction::MapSources | EditorAction::LoadRegion => {}
+        EditorAction::SelectRegion => {
+            ui_state.workspace.ensure_panel(starter_ui::PanelId::Map);
+            ui_state.workspace.activate(starter_ui::PanelId::Map);
+        }
         EditorAction::Diagnostics => ui_state.diagnostics = !ui_state.diagnostics,
         EditorAction::Appearance => ui_state.appearance_open = true,
         EditorAction::Select => {

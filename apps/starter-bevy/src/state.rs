@@ -59,7 +59,10 @@ impl Default for UiState {
                 let mut workspace = crate::layout::load().unwrap_or_else(|| {
                     let mut workspace = Workspace::default();
                     workspace.ensure_panel(starter_ui::PanelId::Map);
-                    workspace.activate(starter_ui::PanelId::Map);
+                    workspace.set_visible(starter_ui::PanelId::Components, false);
+                    workspace.set_visible(starter_ui::PanelId::Charts, false);
+                    workspace.set_visible(starter_ui::PanelId::DataTable, false);
+                    workspace.activate(starter_ui::PanelId::Viewport);
                     workspace
                 });
                 workspace.ensure_panel(starter_ui::PanelId::Map);
@@ -101,6 +104,8 @@ pub enum EditorAction {
     Diagnostics,
     Appearance,
     Select,
+    SelectRegion,
+    LoadRegion,
     SetLoad(usize),
 }
 

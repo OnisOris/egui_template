@@ -39,7 +39,7 @@ pub struct Panels<'a> {
     pub notice: &'a mut Option<String>,
 }
 
-pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
+pub fn show(ui: &mut Ui, panels: Panels<'_>) -> (Vec<Command>, Vec<crate::state::EditorAction>) {
     let Panels {
         project,
         models,
@@ -65,6 +65,7 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
         notice,
     } = panels;
     let mut commands = Vec::new();
+    let mut actions = Vec::new();
     let mut open = false;
     let mut map_visible = false;
     let mut viewport_visible = false;
@@ -120,6 +121,13 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
                         .reset(crate::scene::objects::bounds(document));
                 }
             }
+            if !project_io.benchmark
+                && (real.data.is_none() || project.document.object_count() == 0)
+                && let Some(action) =
+                    super::empty_states::show(panel_ui, project, real.data.is_some())
+            {
+                actions.push(action);
+            }
             let response = viewport::input::show(
                 panel_ui,
                 viewport,
@@ -148,14 +156,19 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
             if project_io.benchmark {
                 commands.extend(show_inspector(panel_ui, document, inspector));
             } else {
-                super::project_inspector::show(
-                    panel_ui,
-                    project,
-                    project_io,
-                    real,
-                    project_inspector,
-                    models,
-                );
+                bevy_egui::egui::ScrollArea::vertical()
+                    .id_salt("inspector_scroll")
+                    .auto_shrink([false, false])
+                    .show(panel_ui, |panel_ui| {
+                        super::project_inspector::show(
+                            panel_ui,
+                            project,
+                            project_io,
+                            real,
+                            project_inspector,
+                            models,
+                        );
+                    });
             }
         }
         PanelId::DataTable => {
@@ -191,7 +204,7 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
     if open {
         workspace.activate(PanelId::Viewport);
     }
-    commands
+    (commands, actions)
 }
 
 fn charts(ui: &mut Ui, metrics: &EditorMetrics) {
