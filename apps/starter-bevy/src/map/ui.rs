@@ -22,10 +22,10 @@ pub fn show(
     let (import, satellite) = imports;
     let mut open = false;
     egui::Panel::top("map_tools").show(ui, |ui| {
-        ui.heading("Map · Region picker");
+        ui.heading("Map");
         search_bar(ui, picker);
         picker.imagery.controls(ui);
-        ui.menu_button("Satellite Packages", |ui| {
+        ui.menu_button("⋯ Packages", |ui| {
             if ui.button("Import Existing Package…").clicked() {
                 if scene.data.is_some()
                     && scene.revision == active.get().map(|(revision, _)| revision)
@@ -43,18 +43,15 @@ pub fn show(
     });
     egui::ScrollArea::vertical()
         .id_salt("map_region_controls")
-        .max_height(260.0)
+        .max_height(220.0)
         .show(ui, |ui| {
             open = region_details(ui, picker, active, runtime, import, scene);
         });
     egui::Panel::bottom("map_attribution")
-        .min_size(38.0)
+        .min_size(28.0)
         .show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
                 picker.imagery.attribution(ui);
-                if let Some(cursor) = picker.selection.cursor {
-                    ui.monospace(format!("{:.6}°, {:.6}°", cursor.latitude, cursor.longitude));
-                }
                 if ui.small_button("Retry tiles").clicked() {
                     picker.tiles = None;
                     if picker.imagery.enabled {
@@ -111,23 +108,22 @@ fn region_details(
         let center = b.center();
         ui.horizontal_wrapped(|ui| {
             ui.strong(if preview.is_some() {
-                "Draft region"
+                "Selected Region · Draft"
             } else {
-                "Confirmed region"
+                "Selected Region · Confirmed"
             });
-            ui.monospace(format!(
-                "N {:.6}°  S {:.6}°  W {:.6}°  E {:.6}°",
+            ui.weak(format!("{:.2} × {:.2} km", width / 1000., height / 1000.));
+        });
+        ui.collapsing("Region details", |ui| {
+            ui.label(format!(
+                "Center {:.6}°, {:.6}°",
+                center.latitude, center.longitude
+            ));
+            ui.label(format!(
+                "N {:.6}° · S {:.6}° · W {:.6}° · E {:.6}°",
                 b.north, b.south, b.west, b.east
             ));
         });
-        ui.label(format!(
-            "{:.3} × {:.3} km · ≈ {:.3} km² · Center {:.6}°, {:.6}°",
-            width / 1000.0,
-            height / 1000.0,
-            b.area() / 1e6,
-            center.latitude,
-            center.longitude
-        ));
     } else {
         ui.label("Pan and zoom to a place, then use Select Region to draw a rectangle.");
     }
@@ -231,9 +227,6 @@ fn region_details(
         }
     }
     super::controls::status(ui, active, import, scene);
-    if let Some((revision, _)) = active.get() {
-        ui.small(format!("Confirmed revision {revision} · Load in 3D uses this region. Demo is explicitly synthetic."));
-    }
     if let Some(error) = &picker.selection.error {
         ui.colored_label(ui.visuals().error_fg_color, error);
     }

@@ -15,7 +15,9 @@ use crate::{
     viewport::{self, ViewportCamera, ViewportState},
 };
 
+mod appearance;
 pub mod chrome;
+mod diagnostics;
 pub mod gallery;
 mod model_inspector;
 pub mod panels;
@@ -91,6 +93,7 @@ pub(crate) fn editor_ui(
         let UiState {
             workspace,
             theme,
+            appearance,
             explorer,
             inspector,
             table,
@@ -99,8 +102,9 @@ pub(crate) fn editor_ui(
             project_explorer,
             marker_table,
             project_inspector,
+            ..
         } = &mut *ui_state;
-        theme.apply(ctx);
+        appearance.apply(ctx, *theme);
         actions = chrome::show(
             &mut root,
             workspace,
@@ -176,6 +180,14 @@ pub(crate) fn editor_ui(
         &mut viewport,
         &model_scene,
     );
+    appearance::show(contexts.ctx_mut()?, &mut ui_state);
+    diagnostics::show(
+        contexts.ctx_mut()?,
+        &mut ui_state.diagnostics,
+        &metrics,
+        &real,
+        &picker,
+    );
     metrics.ui_ms = started.elapsed().as_secs_f32() * 1000.0;
     Ok(())
 }
@@ -224,6 +236,12 @@ fn apply(
             io.request(action, project);
         }
         EditorAction::MapSources => {}
+        EditorAction::Diagnostics => ui_state.diagnostics = !ui_state.diagnostics,
+        EditorAction::Appearance => ui_state.appearance_open = true,
+        EditorAction::Select => {
+            project.placing_marker = false;
+            project.placing_model = None;
+        }
         EditorAction::ExitDemo => {
             io.benchmark = false;
             dispatch(document, &mut ui_state.notice, Command::NewDocument);

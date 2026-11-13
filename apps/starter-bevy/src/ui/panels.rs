@@ -104,9 +104,6 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
         PanelId::Viewport => {
             viewport_visible = true;
             {
-                if runtime.mode == crate::map::SceneMode::Real {
-                    crate::map::city_view::controls(panel_ui, project, runtime);
-                }
                 let mode = runtime.mode;
                 crate::map::controls::viewport_bar(
                     panel_ui,
@@ -115,11 +112,8 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
                     active,
                     (import, satellite),
                     real,
-                    project_io.benchmark,
+                    (project, project_io.benchmark),
                 );
-                if runtime.mode == crate::map::SceneMode::Real {
-                    panel_ui.small(&picker.imagery.live_status);
-                }
                 if mode != runtime.mode && runtime.mode == crate::map::SceneMode::Editor {
                     viewport
                         .camera

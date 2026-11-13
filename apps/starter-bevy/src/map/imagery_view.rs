@@ -76,20 +76,20 @@ impl ImageryView {
             ui.add_enabled_ui(self.tiles.is_some(), |ui| {
                 ui.selectable_value(&mut self.enabled, true, "Satellite");
             });
-            if self.tiles.is_none() {
-                ui.small(
-                    self.message
-                        .as_deref()
-                        .unwrap_or("Checking satellite source…"),
-                );
-            }
-            if ui.small_button("Map Sources…").clicked() {
-                self.settings_open = true;
-            }
-            if ui.small_button("Reload source").clicked() {
-                self.retry();
-                self.enabled = false;
-            }
+            ui.menu_button("Sources", |ui| {
+                if let Some(message) = &self.message {
+                    ui.label(message);
+                }
+                if ui.button("Map Sources…").clicked() {
+                    self.settings_open = true;
+                    ui.close();
+                }
+                if ui.button("Reload source").clicked() {
+                    self.retry();
+                    self.enabled = false;
+                    ui.close();
+                }
+            });
         });
     }
     pub fn attribution(&self, ui: &mut Ui) {

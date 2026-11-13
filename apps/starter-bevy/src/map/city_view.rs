@@ -129,34 +129,3 @@ pub fn update(
         m.unlit = mode == GeoViewMode::City;
     }
 }
-pub fn controls(
-    ui: &mut bevy_egui::egui::Ui,
-    project: &mut Project,
-    runtime: &mut super::RegionRuntime,
-) {
-    ui.horizontal_wrapped(|ui| {
-        let before = project.document.geo_view_mode;
-        for (mode, label) in [
-            (GeoViewMode::City, "City 3D"),
-            (GeoViewMode::Terrain, "Terrain 3D"),
-            (GeoViewMode::Combined, "Combined"),
-        ] {
-            ui.selectable_value(&mut project.document.geo_view_mode, mode, label);
-        }
-        let mut changed = before != project.document.geo_view_mode;
-        for (kind, label) in [
-            (starter_core::LayerKind::Buildings, "Buildings"),
-            (starter_core::LayerKind::Roads, "Roads"),
-        ] {
-            changed |= ui
-                .checkbox(&mut project.document.layer_mut(kind).visible, label)
-                .changed();
-        }
-        if ui.small_button("Reload vectors").clicked() {
-            runtime.vector_requested = true;
-        }
-        if changed {
-            project.changed();
-        }
-    });
-}

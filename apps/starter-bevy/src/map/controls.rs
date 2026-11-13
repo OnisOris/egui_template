@@ -39,114 +39,124 @@ pub fn viewport_bar(
         &mut super::satellite_scene::SatelliteImport,
     ),
     scene: &mut RealScene,
-    benchmark: bool,
+    session: (&mut crate::project::Project, bool),
 ) {
+    let (project, benchmark) = session;
     let (import, satellite) = imports;
-    if !scene.vector_status.is_empty() {
-        ui.small(&scene.vector_status);
-    }
     ui.horizontal_wrapped(|ui| {
-        ui.strong(match runtime.mode {
-            SceneMode::Demo => "Demo · synthetic",
-            SceneMode::Real if scene.view_mode == starter_core::GeoViewMode::City => {
-                "City 3D · Flat ground"
-            }
-            SceneMode::Real if scene.satellite_enabled => "Real DEM · Satellite",
-            SceneMode::Real => "Real DEM · Terrain",
-            SceneMode::Editor if benchmark => "Demo / Benchmark",
-            SceneMode::Editor => "Project",
-        });
         if runtime.mode == SceneMode::Real {
-            if let Some(data) = &scene.data {
-                ui.label(&data.manifest.source)
-                    .on_hover_text(&data.manifest.attribution);
+            let before = project.document.geo_view_mode;
+            ui.spacing_mut().item_spacing.x = 2.;
+            for (mode, label) in [
+                (starter_core::GeoViewMode::City, "City 3D"),
+                (starter_core::GeoViewMode::Terrain, "Terrain 3D"),
+                (starter_core::GeoViewMode::Combined, "Combined"),
+            ] {
+                ui.selectable_value(&mut project.document.geo_view_mode, mode, label);
             }
-            if ui.small_button("Import Vectors…").clicked() {
-                scene.vector_import_requested = true;
+            if before != project.document.geo_view_mode {
+                project.changed();
             }
-            ui.checkbox(&mut scene.grid_enabled, "Grid");
-            ui.selectable_value(&mut scene.satellite_enabled, false, "Terrain");
-            ui.add_enabled_ui(scene.satellite.is_some(), |ui| {
-                ui.selectable_value(&mut scene.satellite_enabled, true, "Satellite");
+            ui.separator();
+            for (kind, label) in [
+                (starter_core::LayerKind::Buildings, "Buildings"),
+                (starter_core::LayerKind::Roads, "Roads"),
+                (starter_core::LayerKind::Satellite, "Satellite"),
+            ] {
+                let layer = project.document.layer_mut(kind);
+                if ui.toggle_value(&mut layer.visible, label).changed() {
+                    if kind == starter_core::LayerKind::Satellite {
+                        scene.satellite_enabled = layer.visible && scene.satellite.is_some();
+                    }
+                    project.changed();
+                }
+            }
+            ui.toggle_value(&mut scene.grid_enabled, "Grid");
+        } else {
+            ui.strong(if benchmark {
+                "Demo / Benchmark"
+            } else {
+                "3D Scene"
             });
-            if ui.small_button("Import Existing Package…").clicked() {
-                satellite.packages.open = true;
+        }
+        ui.separator();
+        ui.menu_button("Camera", |ui| {
+            if ui
+                .button(viewport.camera.projection.label())
+                .on_hover_text("Switch perspective / orthographic projection")
+                .clicked()
+            {
+                viewport.camera.projection.toggle();
             }
-        }
+            if ui.button("Reset Camera").clicked() {
+                focus_geo(viewport);
+                ui.close();
+            }
+            ui.label("LMB orbit · RMB pan · wheel zoom");
+        });
         if ui
-            .add_enabled(
-                runtime.mode != SceneMode::Editor,
-                egui::Button::new("Reset Camera"),
-            )
-            .clicked()
-        {
-            focus_geo(viewport);
-        }
-        if ui
-            .add_enabled(
-                runtime.mode != SceneMode::Editor,
-                egui::Button::new("Fit Terrain"),
-            )
+            .add_enabled(runtime.mode != SceneMode::Editor, egui::Button::new("Fit"))
+            .on_hover_text("Fit the region while retaining camera orientation")
             .clicked()
         {
             let orbit = (viewport.camera.yaw, viewport.camera.pitch);
             focus_geo(viewport);
             (viewport.camera.yaw, viewport.camera.pitch) = orbit;
         }
-        if ui.small_button("Import DEM…").clicked() {
-            import.start(active, None, scene.fingerprint());
-        }
+        ui.menu_button("⋯", |ui| {
+            if ui.button("Import DEM…").clicked() {
+                import.start(active, None, scene.fingerprint());
+                ui.close();
+            }
+            if ui.button("Import Existing Package…").clicked() {
+                satellite.packages.open = true;
+                ui.close();
+            }
+            if ui.button("Import Vectors…").clicked() {
+                scene.vector_import_requested = true;
+                ui.close();
+            }
+            if ui.button("Reload Vectors").clicked() {
+                runtime.vector_requested = true;
+                ui.close();
+            }
+        })
+        .response
+        .on_hover_text("Import and reload geographic data");
     });
-    if runtime.mode == SceneMode::Real
-        && let Some(data) = &scene.data
-    {
-        let m = &data.manifest;
-        ui.small(format!(
-            "{} × {} · {:.1}…{:.1} m MSL · {}",
-            m.width, m.height, m.min_elevation_msl, m.max_elevation_msl, m.terrain_id
-        ));
-        ui.small(format!(
-            "DEM step {:.1} × {:.1} m · Reference: {}",
-            m.spacing_x_m, m.spacing_y_m, m.reference_elevation_source
-        ));
-        if scene.revision != active.get().map(|(r, _)| r) {
-            ui.colored_label(
-                egui::Color32::YELLOW,
-                "Previous region remains visible. Import and open the new region to replace it.",
-            );
+    if runtime.mode == SceneMode::Real {
+        ui.horizontal_wrapped(|ui| {
+            ui.small("DEM: Ready");
+            ui.small(if scene.satellite.is_some() {
+                "Satellite: Ready"
+            } else {
+                "Satellite: Unavailable"
+            });
+            if !scene.vector_status.is_empty() {
+                let compact = scene
+                    .vector_status
+                    .split('·')
+                    .take(3)
+                    .collect::<Vec<_>>()
+                    .join(" · ");
+                ui.small(compact)
+                    .on_hover_text("Select Buildings or Roads in Explorer for source details");
+            }
+        });
+        if let Some(s) = &scene.satellite {
+            ui.small(&s.metadata.attribution);
         }
+    }
+    if import.loading() || import.builder.loading || import.error.is_some() {
+        status(ui, active, import, scene);
     }
     if satellite.loading() {
-        ui.label("Loading satellite JPEG… UI remains available.");
+        ui.horizontal(|ui| {
+            ui.spinner();
+            ui.label("Loading satellite…");
+        });
     }
-    if let Some(error) = &satellite.error
-        && !(satellite.packages.open && satellite.pending.is_some())
-    {
-        ui.colored_label(
-            ui.visuals().error_fg_color,
-            format!("Satellite error · {error}"),
-        );
-    }
-    if runtime.mode == SceneMode::Real
-        && scene.satellite_enabled
-        && let Some(loaded) = &scene.satellite
-    {
-        if matches!(
-            loaded.source,
-            super::satellite_scene::ImagerySource::Package(_)
-        ) {
-            ui.small(format!(
-                "Satellite: Local Package · imagery zoom {}",
-                loaded.metadata.zoom
-            ));
-        }
-        ui.small(&loaded.metadata.attribution);
-    }
-    if !import.builder.status().is_empty()
-        || import.loading()
-        || import.error.is_some()
-        || runtime.mode == SceneMode::Editor
-    {
-        status(ui, active, import, scene);
+    if let Some(error) = &satellite.error {
+        ui.colored_label(ui.visuals().error_fg_color, error);
     }
 }

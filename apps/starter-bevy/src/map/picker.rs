@@ -148,9 +148,10 @@ impl MapViewState {
 
 pub fn search_bar(ui: &mut Ui, picker: &mut MapPicker) {
     ui.horizontal_wrapped(|ui| {
-        ui.label("Latitude, longitude");
         let response = ui.add(
-            bevy_egui::egui::TextEdit::singleline(&mut picker.view.search).desired_width(210.0),
+            bevy_egui::egui::TextEdit::singleline(&mut picker.view.search)
+                .hint_text("Latitude, longitude")
+                .desired_width(210.0),
         );
         if ui.button("Go").clicked()
             || (response.lost_focus() && ui.input(|i| i.key_pressed(bevy_egui::egui::Key::Enter)))

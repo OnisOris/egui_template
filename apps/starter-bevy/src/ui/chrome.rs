@@ -1,14 +1,13 @@
+use crate::{metrics::EditorMetrics, state::EditorAction, viewport::ProjectionMode};
 use bevy_egui::egui::{self, Ui};
 use starter_core::{DocumentState, TEST_LOADS};
 use starter_ui::{PanelId, Workspace};
-
-use crate::{metrics::EditorMetrics, state::EditorAction, viewport::ProjectionMode};
 
 pub fn show(
     ui: &mut Ui,
     workspace: &mut Workspace,
     session: (&DocumentState, &starter_core::ProjectState, bool),
-    metrics: &EditorMetrics,
+    _metrics: &EditorMetrics,
     projection: ProjectionMode,
     sensitivity: &mut f32,
     notice: Option<&str>,
@@ -19,30 +18,6 @@ pub fn show(
     } else {
         project.document.object_count()
     };
-    let selected = if benchmark {
-        document.selection().len()
-    } else {
-        usize::from(matches!(
-            project.selection,
-            starter_core::ProjectSelection::Marker(_) | starter_core::ProjectSelection::Model(_)
-        ))
-    };
-    let mut actions = menu(ui, workspace, projection, sensitivity);
-    actions.extend(toolbar(
-        ui,
-        (count, &project.document.name, project.dirty, benchmark),
-        projection,
-    ));
-    status(ui, (count, selected), metrics, projection, notice);
-    actions
-}
-
-fn menu(
-    ui: &mut Ui,
-    workspace: &mut Workspace,
-    projection: ProjectionMode,
-    sensitivity: &mut f32,
-) -> Vec<EditorAction> {
     let mut actions = Vec::new();
     egui::Panel::top("bevy_menu_bar").show(ui, |ui| {
         egui::MenuBar::new().ui(ui, |ui| {
@@ -55,166 +30,161 @@ fn menu(
                     ("Import Asset…", EditorAction::ImportAsset),
                     ("Exit", EditorAction::Exit),
                 ] {
-                    if ui.button(label).clicked() {
-                        actions.push(action);
-                        ui.close();
-                    }
+                    command(ui, label, action, &mut actions);
                 }
+            });
+            ui.menu_button("Edit", |ui| {
+                command(ui, "Add Marker", EditorAction::AddObject, &mut actions);
+                command(ui, "Import Model…", EditorAction::ImportAsset, &mut actions);
+                command(
+                    ui,
+                    "Delete Selection",
+                    EditorAction::DeleteSelection,
+                    &mut actions,
+                );
+            });
+            ui.menu_button("View", |ui| {
+                ui.menu_button("Panels", |ui| {
+                    for panel in PanelId::ALL
+                        .into_iter()
+                        .filter(|p| *p != PanelId::Components)
+                    {
+                        let mut visible = workspace.is_visible(panel);
+                        if ui.checkbox(&mut visible, panel.title()).changed() {
+                            workspace.ensure_panel(panel);
+                            workspace.set_visible(panel, visible);
+                        }
+                    }
+                });
+                command(ui, "Reset Layout", EditorAction::ResetLayout, &mut actions);
+                ui.menu_button("Camera", |ui| {
+                    command(
+                        ui,
+                        "Focus Selection",
+                        EditorAction::FocusSelection,
+                        &mut actions,
+                    );
+                    command(ui, "Reset View", EditorAction::ResetView, &mut actions);
+                    command(
+                        ui,
+                        &format!("{} → switch projection", projection.label()),
+                        EditorAction::ToggleProjection,
+                        &mut actions,
+                    );
+                });
+                command(ui, "Toggle Theme", EditorAction::ToggleTheme, &mut actions);
             });
             ui.menu_button("Tools", |ui| {
                 ui.menu_button("Demo / Benchmark", |ui| {
                     for count in TEST_LOADS {
-                        if ui.button(format!("{count} demo objects")).clicked() {
-                            actions.push(EditorAction::SetLoad(count));
-                            ui.close();
-                        }
+                        command(
+                            ui,
+                            &format!("{count} demo objects"),
+                            EditorAction::SetLoad(count),
+                            &mut actions,
+                        );
                     }
-                    if ui.button("Return to Project").clicked() {
-                        actions.push(EditorAction::ExitDemo);
+                    command(
+                        ui,
+                        "Return to Project",
+                        EditorAction::ExitDemo,
+                        &mut actions,
+                    );
+                });
+                ui.menu_button("Developer", |ui| {
+                    command(ui, "Diagnostics", EditorAction::Diagnostics, &mut actions);
+                    if ui.button("Component Gallery").clicked() {
+                        workspace.ensure_panel(PanelId::Components);
+                        workspace.activate(PanelId::Components);
                         ui.close();
                     }
                 });
             });
-            ui.menu_button("Edit", |ui| {
-                for (label, action) in [
-                    ("Add Object → Marker", EditorAction::AddObject),
-                    ("Delete selection", EditorAction::DeleteSelection),
-                ] {
-                    if ui.button(label).clicked() {
-                        actions.push(action);
-                        ui.close();
-                    }
-                }
-            });
-            ui.menu_button("View", |ui| {
-                for (label, action) in [
-                    ("Focus selection", EditorAction::FocusSelection),
-                    ("Reset view", EditorAction::ResetView),
-                    ("Reset layout", EditorAction::ResetLayout),
-                ] {
-                    if ui.button(label).clicked() {
-                        actions.push(action);
-                        ui.close();
-                    }
-                }
-                if ui
-                    .button(format!("Toggle {} projection", projection.label()))
-                    .clicked()
-                {
-                    actions.push(EditorAction::ToggleProjection);
-                    ui.close();
-                }
-                ui.add(egui::Slider::new(sensitivity, 0.1..=3.0).text("Camera sensitivity"));
-                ui.separator();
-                for panel in PanelId::ALL {
-                    let mut visible = workspace.is_visible(panel);
-                    if ui.checkbox(&mut visible, panel.title()).changed() {
-                        workspace.set_visible(panel, visible);
-                    }
-                }
-            });
             ui.menu_button("Settings", |ui| {
-                if ui.button("Map Sources…").clicked() {
-                    actions.push(EditorAction::MapSources);
-                    ui.close();
+                command(ui, "Appearance…", EditorAction::Appearance, &mut actions);
+                command(ui, "Map Sources…", EditorAction::MapSources, &mut actions);
+                ui.menu_button("Camera Controls", |ui| {
+                    ui.add(egui::Slider::new(sensitivity, 0.1..=3.0).text("Sensitivity"));
+                    ui.label("LMB orbit · RMB pan · wheel zoom");
+                });
+            });
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if project.dirty {
+                    ui.colored_label(starter_ui::style::WARNING, "●")
+                        .on_hover_text("Unsaved changes");
                 }
-                if ui.button("Toggle theme").clicked() {
-                    actions.push(EditorAction::ToggleTheme);
-                    ui.close();
-                }
+                ui.label(&project.document.name);
             });
         });
     });
-    actions
-}
-
-fn toolbar(
-    ui: &mut Ui,
-    session: (usize, &str, bool, bool),
-    projection: ProjectionMode,
-) -> Vec<EditorAction> {
-    let (objects, name, dirty, benchmark) = session;
-    let mut actions = Vec::new();
     egui::Panel::top("bevy_toolbar").show(ui, |ui| {
         ui.horizontal_wrapped(|ui| {
             if benchmark {
                 ui.strong("Demo / Benchmark");
-                if ui.button("Return to Project").clicked() {
-                    actions.push(EditorAction::ExitDemo);
-                }
+                command(
+                    ui,
+                    "Return to Project",
+                    EditorAction::ExitDemo,
+                    &mut actions,
+                );
             } else {
-                ui.strong(name);
-                if dirty {
-                    ui.label("●");
+                ui.menu_button("＋ Add Object", |ui| {
+                    command(ui, "Map Marker", EditorAction::AddObject, &mut actions);
+                    command(ui, "Import Model…", EditorAction::ImportAsset, &mut actions);
+                })
+                .response
+                .on_hover_text("Add a geographic marker or import a GLB model");
+                if ui
+                    .selectable_label(
+                        project.placing_model.is_none() && !project.placing_marker,
+                        "Select",
+                    )
+                    .on_hover_text("Cancel placement and select objects")
+                    .clicked()
+                {
+                    actions.push(EditorAction::Select);
+                }
+                command(ui, "Focus", EditorAction::FocusSelection, &mut actions);
+            }
+            ui.separator();
+            for (panel, label) in [
+                (PanelId::Map, "Map"),
+                (PanelId::Viewport, "3D"),
+                (PanelId::Charts, "Analysis"),
+            ] {
+                if ui.button(label).clicked() {
+                    workspace.ensure_panel(panel);
+                    workspace.activate(panel);
                 }
             }
-            if ui.button("Save").clicked() {
-                actions.push(EditorAction::Save);
-            }
-            if ui.button("New").clicked() {
-                actions.push(EditorAction::New);
-            }
-            if ui
-                .add_enabled(!benchmark, egui::Button::new("+ Marker"))
-                .clicked()
-            {
-                actions.push(EditorAction::AddObject);
-            }
-            if ui.button("Delete").clicked() {
-                actions.push(EditorAction::DeleteSelection);
+        });
+    });
+    egui::Panel::bottom("bevy_status_bar").show(ui, |ui| {
+        ui.horizontal_wrapped(|ui| {
+            if let Some(notice) = notice {
+                ui.colored_label(ui.visuals().error_fg_color, notice);
+            } else {
+                ui.colored_label(starter_ui::style::SUCCESS, "Ready");
             }
             ui.separator();
-            if ui.button("Focus").clicked() {
-                actions.push(EditorAction::FocusSelection);
-            }
-            if ui.button("Reset view").clicked() {
-                actions.push(EditorAction::ResetView);
-            }
-            if ui
-                .button(format!("Projection: {}", projection.label()))
-                .clicked()
-            {
-                actions.push(EditorAction::ToggleProjection);
+            if let Some(region) = project.document.map_region {
+                let (w, h) = region.bounds.dimensions();
+                ui.label(format!("Region {:.2} × {:.2} km", w / 1000., h / 1000.));
+            } else {
+                ui.weak("No region selected");
             }
             ui.separator();
-            ui.label(format!("{objects} objects"));
+            ui.label(format!("{count} objects"));
+            if project.placing_marker || project.placing_model.is_some() {
+                ui.label("Click Map to place · Esc cancels");
+            }
         });
     });
     actions
 }
-
-fn status(
-    ui: &mut Ui,
-    counts: (usize, usize),
-    metrics: &EditorMetrics,
-    projection: ProjectionMode,
-    notice: Option<&str>,
-) {
-    egui::Panel::bottom("bevy_status_bar").show(ui, |ui| {
-        ui.horizontal(|ui| {
-            ui.label(format!(
-                "FPS {:.1} · {:.2} ms",
-                metrics.fps, metrics.frame_ms
-            ));
-            ui.separator();
-            ui.label(format!(
-                "UI {:.2} ms · sync {:.2} ms · build {:.2} ms",
-                metrics.ui_ms, metrics.sync_ms, metrics.scene_build_ms
-            ));
-            ui.separator();
-            ui.label(format!(
-                "Objects {} · entities {}",
-                counts.0, metrics.projected_entities
-            ));
-            ui.separator();
-            ui.label(format!("Selected {}", counts.1));
-            ui.separator();
-            ui.label(projection.label());
-            ui.weak("GPU frame time not exposed");
-            if let Some(notice) = notice {
-                ui.separator();
-                ui.label(notice);
-            }
-        });
-    });
+fn command(ui: &mut Ui, label: &str, action: EditorAction, actions: &mut Vec<EditorAction>) {
+    if ui.button(label).clicked() {
+        actions.push(action);
+        ui.close();
+    }
 }

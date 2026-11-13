@@ -39,6 +39,9 @@ impl DerefMut for DocumentResource {
 pub struct UiState {
     pub workspace: Workspace,
     pub theme: Theme,
+    pub diagnostics: bool,
+    pub appearance_open: bool,
+    pub appearance: starter_ui::style::Appearance,
     pub explorer: ExplorerTree<ExplorerNodeId>,
     pub inspector: InspectorState,
     pub table: TableState,
@@ -63,6 +66,9 @@ impl Default for UiState {
                 workspace
             },
             theme: Theme::Dark,
+            diagnostics: false,
+            appearance_open: false,
+            appearance: Default::default(),
             explorer: ExplorerTree::default(),
             inspector: InspectorState::default(),
             table: TableState::default(),
@@ -92,6 +98,9 @@ pub enum EditorAction {
     ToggleProjection,
     ToggleTheme,
     MapSources,
+    Diagnostics,
+    Appearance,
+    Select,
     SetLoad(usize),
 }
 
