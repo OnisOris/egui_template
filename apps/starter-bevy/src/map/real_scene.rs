@@ -11,6 +11,8 @@ use std::sync::Arc;
 
 #[derive(Resource)]
 pub struct RealScene {
+    pub vector_import_requested: bool,
+    pub vector_status: String,
     pub data: Option<Arc<TerrainPayload>>,
     pub revision: Option<u64>,
     pub grid_enabled: bool,
@@ -23,6 +25,8 @@ pub struct RealScene {
 impl Default for RealScene {
     fn default() -> Self {
         Self {
+            vector_import_requested: false,
+            vector_status: String::new(),
             data: None,
             revision: None,
             grid_enabled: true,

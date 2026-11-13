@@ -26,6 +26,7 @@ pub mod sources;
 mod terrain;
 mod tiles;
 pub mod ui;
+pub mod vectors;
 
 use bevy::prelude::*;
 use picker::MapPicker;
@@ -55,6 +56,7 @@ impl Plugin for MapPlugin {
             .init_resource::<objects::MarkerScene>()
             .init_resource::<ActiveMapRegion>()
             .init_resource::<RegionRuntime>()
+            .init_resource::<vectors::VectorScene>()
             .init_resource::<demo::DemoScene>()
             .init_resource::<loading::TerrainImport>()
             .init_resource::<real_scene::RealScene>()
@@ -73,6 +75,7 @@ impl Plugin for MapPlugin {
                     imagery_3d::update,
                     satellite_scene::update_material,
                     imagery_detail::update,
+                    vectors::update,
                     real_scene::grid_visibility,
                     objects::sync,
                     grid_style::draw,

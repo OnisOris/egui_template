@@ -42,6 +42,9 @@ pub fn viewport_bar(
     benchmark: bool,
 ) {
     let (import, satellite) = imports;
+    if !scene.vector_status.is_empty() {
+        ui.small(&scene.vector_status);
+    }
     ui.horizontal_wrapped(|ui| {
         ui.strong(match runtime.mode {
             SceneMode::Demo => "Demo · synthetic",
@@ -54,6 +57,9 @@ pub fn viewport_bar(
             if let Some(data) = &scene.data {
                 ui.label(&data.manifest.source)
                     .on_hover_text(&data.manifest.attribution);
+            }
+            if ui.small_button("Import Vectors…").clicked() {
+                scene.vector_import_requested = true;
             }
             ui.checkbox(&mut scene.grid_enabled, "Grid");
             ui.selectable_value(&mut scene.satellite_enabled, false, "Terrain");
