@@ -172,6 +172,11 @@ pub fn read_package(
 
 pub fn prepare_uvs(payload: &mut SatellitePayload, terrain: &TerrainPayload) -> Result<(), String> {
     payload.manifest.validate(Some(terrain))?;
+    payload.uvs = terrain_uvs(terrain, &payload.manifest.satellite.georeference);
+    Ok(())
+}
+
+pub fn terrain_uvs(terrain: &TerrainPayload, georeference: &Georeference) -> Vec<Vec<[f32; 2]>> {
     let m = &terrain.manifest;
     let mut uvs = Vec::new();
     for y in (0..m.height - 1).step_by(CHUNK_CELLS as usize) {
@@ -181,12 +186,11 @@ pub fn prepare_uvs(payload: &mut SatellitePayload, terrain: &TerrainPayload) -> 
                 for col in x..=x + CHUNK_CELLS.min(m.width - 1 - x) {
                     let p = terrain.position(col, row);
                     let (lon, lat) = local_to_wgs84(m.origin, p[0], p[1]);
-                    uv.push(payload.manifest.satellite.georeference.uv(lon, lat));
+                    uv.push(georeference.uv(lon, lat));
                 }
             }
             uvs.push(uv);
         }
     }
-    payload.uvs = uvs;
-    Ok(())
+    uvs
 }

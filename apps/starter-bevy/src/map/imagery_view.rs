@@ -4,6 +4,7 @@ use bevy_egui::egui::{self, Ui};
 #[derive(Default)]
 pub struct ImageryView {
     pub enabled: bool,
+    pub live_status: String,
     pub tiles: Option<ImageryTiles>,
     pub message: Option<String>,
     attempted: bool,

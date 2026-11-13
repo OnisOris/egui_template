@@ -117,10 +117,10 @@ pub fn sync_project(
             (LayerKind::Terrain, Some(data.manifest.terrain_id.clone())),
             (
                 LayerKind::Satellite,
-                scene
-                    .satellite
-                    .as_ref()
-                    .map(|s| s.manifest.map_data_id.clone()),
+                scene.satellite.as_ref().and_then(|s| match &s.source {
+                    crate::map::satellite_scene::ImagerySource::Package(id) => Some(id.clone()),
+                    crate::map::satellite_scene::ImagerySource::Live { .. } => None,
+                }),
             ),
         ] {
             let layer = project.document.layer_mut(kind);

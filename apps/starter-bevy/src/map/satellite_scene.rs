@@ -2,7 +2,7 @@
 use super::{
     real_scene::{RealScene, SceneAssets},
     region::ActiveMapRegion,
-    satellite::{self, MapManifest, SatellitePayload},
+    satellite::{self, SatellitePayload},
 };
 use bevy::{
     asset::RenderAssetUsages,
@@ -13,9 +13,15 @@ use bevy::{
 };
 use std::path::PathBuf;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ImagerySource {
+    Package(String),
+    Live { generation: u64 },
+}
 pub struct InstalledSatellite {
     pub image: Handle<Image>,
-    pub manifest: MapManifest,
+    pub source: ImagerySource,
+    pub metadata: super::satellite::SatelliteMetadata,
     pub fingerprint: blake3::Hash,
 }
 #[derive(Resource, Default)]
@@ -171,9 +177,29 @@ pub fn install(
         scene.satellite_enabled = true;
         return Ok(());
     }
+    install_texture(
+        scene,
+        assets,
+        payload.manifest.satellite,
+        ImagerySource::Package(payload.manifest.map_data_id),
+        payload.rgba,
+        payload.uvs,
+        payload.fingerprint,
+    )
+}
+
+pub fn install_texture(
+    scene: &mut RealScene,
+    assets: &mut SceneAssets,
+    metadata: super::satellite::SatelliteMetadata,
+    source: ImagerySource,
+    rgba: Vec<u8>,
+    uvs: Vec<Vec<[f32; 2]>>,
+    fingerprint: blake3::Hash,
+) -> Result<(), String> {
     // The last mesh is the line grid. Validate everything before modifying any asset.
-    if payload.uvs.len() + 1 != scene.meshes.len()
-        || payload.uvs.iter().zip(&scene.meshes).any(|(uv, h)| {
+    if uvs.len() + 1 != scene.meshes.len()
+        || uvs.iter().zip(&scene.meshes).any(|(uv, h)| {
             assets
                 .meshes
                 .get(h.id())
@@ -182,7 +208,7 @@ pub fn install(
     {
         return Err("Satellite UV layout differs from the loaded terrain chunks.".into());
     }
-    let s = &payload.manifest.satellite;
+    let s = &metadata;
     let mut image = Image::new(
         Extent3d {
             width: s.width,
@@ -190,13 +216,13 @@ pub fn install(
             depth_or_array_layers: 1,
         },
         TextureDimension::D2,
-        payload.rgba,
+        rgba,
         TextureFormat::Rgba8UnormSrgb,
         RenderAssetUsages::default(),
     );
     image.sampler = ImageSampler::linear();
     let image = assets.images.add(image);
-    for (uv, handle) in payload.uvs.into_iter().zip(&scene.meshes) {
+    for (uv, handle) in uvs.into_iter().zip(&scene.meshes) {
         assets
             .meshes
             .get_mut(handle.id())
@@ -208,8 +234,9 @@ pub fn install(
     }
     scene.satellite = Some(InstalledSatellite {
         image,
-        manifest: payload.manifest,
-        fingerprint: payload.fingerprint,
+        source,
+        metadata,
+        fingerprint,
     });
     scene.satellite_enabled = true;
     scene.grid_enabled = false;

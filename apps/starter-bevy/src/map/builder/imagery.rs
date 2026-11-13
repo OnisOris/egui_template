@@ -22,8 +22,8 @@ pub fn crop(region: crate::map::region::MapRegion, z: u8, size: u32) -> PixelBou
         bottom: b.bottom.ceil(),
     }
 }
-pub fn assemble(
-    tiles: &BTreeMap<Tile, image::RgbImage>,
+pub fn assemble<C: std::ops::Deref<Target = [u8]>>(
+    tiles: &BTreeMap<Tile, image::ImageBuffer<image::Rgb<u8>, C>>,
     z: u8,
     size: u32,
     b: &PixelBounds,
@@ -184,7 +184,8 @@ pub fn configured(path: Option<std::ffi::OsString>) -> Result<Option<ImageryProv
     if let Some(provider) = &provider {
         provider.validate_preview()?;
     }
-    let provider = provider.filter(|p| p.allow_permanent_packages);
+    let export_selected = crate::map::sources::load_saved()?.build_packages;
+    let provider = provider.filter(|p| p.allow_permanent_packages && export_selected);
     if let Some(provider) = &provider {
         provider.validate()?;
     }

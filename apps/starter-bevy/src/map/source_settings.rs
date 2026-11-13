@@ -46,6 +46,24 @@ pub fn show(ui: &mut Ui, view: &mut ImageryView) {
                     &mut settings.online_authorized,
                     "Online access is authorized for this application",
                 );
+                ui.label(format!(
+                    "Online 2D: {}",
+                    if settings.online_authorized {
+                        "enabled"
+                    } else {
+                        "disabled"
+                    }
+                ));
+                ui.checkbox(
+                    &mut p.allow_online_3d,
+                    "Online 3D use is permitted for this source and application",
+                );
+                ui.add_enabled_ui(p.allow_permanent_packages, |ui| {
+                    ui.checkbox(
+                        &mut settings.build_packages,
+                        "Build persistent package on Load in 3D",
+                    );
+                });
                 let mut bearer = p.bearer_env.clone().unwrap_or_default();
                 ui.horizontal(|ui| {
                     ui.label("Token environment variable (optional)");

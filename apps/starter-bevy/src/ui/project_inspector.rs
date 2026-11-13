@@ -103,7 +103,7 @@ pub fn show(
                 }
                 LayerKind::Satellite => {
                     if let Some(s) = &real.satellite {
-                        let m = &s.manifest.satellite;
+                        let m = &s.metadata;
                         ui.label(&m.provider);
                         ui.label(format!(
                             "Zoom {} · {} × {} pixels",

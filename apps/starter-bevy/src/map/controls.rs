@@ -107,15 +107,6 @@ pub fn viewport_bar(
             );
         }
     }
-    if runtime.mode == SceneMode::Real
-        && scene.satellite.is_none()
-        && satellite.pending.is_none()
-        && satellite.error.is_none()
-        && !satellite.loading()
-        && !import.builder.loading
-    {
-        ui.small("DEM Ready · Satellite source not configured");
-    }
     if satellite.loading() {
         ui.label("Loading satellite JPEG… UI remains available.");
     }
@@ -131,7 +122,15 @@ pub fn viewport_bar(
         && scene.satellite_enabled
         && let Some(loaded) = &scene.satellite
     {
-        ui.small(&loaded.manifest.satellite.attribution);
+        ui.small(format!(
+            "Satellite: {} · imagery zoom {}",
+            match loaded.source {
+                super::satellite_scene::ImagerySource::Package(_) => "Local Package",
+                super::satellite_scene::ImagerySource::Live { .. } => "Live",
+            },
+            loaded.metadata.zoom
+        ));
+        ui.small(&loaded.metadata.attribution);
     }
     if !import.builder.status().is_empty()
         || import.loading()

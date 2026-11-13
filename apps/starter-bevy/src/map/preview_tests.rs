@@ -19,6 +19,7 @@ fn esri_preset_is_preview_only_and_configuration_roundtrips_without_secrets() {
     let settings = sources::MapSources {
         provider: Some(p),
         online_authorized: true,
+        build_packages: false,
         package_directory: Some("packages".into()),
     };
     let json = serde_json::to_string(&settings).unwrap();

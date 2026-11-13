@@ -7,6 +7,7 @@ use std::path::PathBuf;
 pub struct MapSources {
     pub provider: Option<ImageryProvider>,
     pub online_authorized: bool,
+    pub build_packages: bool,
     pub package_directory: Option<String>,
 }
 pub fn path() -> Result<PathBuf, String> {

@@ -114,6 +114,9 @@ pub fn show(ui: &mut Ui, panels: Panels<'_>) -> Vec<Command> {
                     real,
                     project_io.benchmark,
                 );
+                if runtime.mode == crate::map::SceneMode::Real {
+                    panel_ui.small(&picker.imagery.live_status);
+                }
                 if mode != runtime.mode && runtime.mode == crate::map::SceneMode::Editor {
                     viewport
                         .camera
