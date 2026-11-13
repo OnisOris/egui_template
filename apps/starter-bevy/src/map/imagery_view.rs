@@ -6,6 +6,7 @@ pub struct ImageryView {
     pub enabled: bool,
     pub live_status: String,
     pub tiles: Option<ImageryTiles>,
+    pub service: Option<super::imagery_service::TileService>,
     pub message: Option<String>,
     attempted: bool,
     pub(super) task: Option<Task<Result<super::sources::MapSources, String>>>,
@@ -16,6 +17,7 @@ pub struct ImageryView {
 impl ImageryView {
     pub fn retry(&mut self) {
         self.tiles = None;
+        self.service = None;
         self.attempted = false;
         self.task = None;
         self.message = None;
@@ -33,26 +35,8 @@ impl ImageryView {
             self.task = None;
             match result {
                 Ok(settings) => {
-                    let provider = settings
-                        .provider
-                        .clone()
-                        .filter(|_| settings.online_authorized);
-                    self.package_directory_update = settings.package_directory.clone();
-                    self.settings = Some(settings);
-                    match provider {
-                        Some(provider) => match ImageryTiles::new(provider, ctx.clone()) {
-                            Ok(tiles) => {
-                                self.tiles = Some(tiles);
-                                self.message = None;
-                            }
-                            Err(e) => self.message = Some(e),
-                        },
-                        None => {
-                            self.message = Some(
-                                "Satellite source not configured or online access not authorized"
-                                    .into(),
-                            )
-                        }
+                    if let Err(e) = self.configure(settings, ctx) {
+                        self.message = Some(e);
                     }
                 }
                 Err(e) => self.message = Some(e),
@@ -61,6 +45,28 @@ impl ImageryView {
         if let Some(tiles) = &mut self.tiles {
             tiles.poll();
         }
+    }
+    pub(super) fn configure(
+        &mut self,
+        settings: super::sources::MapSources,
+        ctx: &egui::Context,
+    ) -> Result<(), String> {
+        self.tiles = None;
+        self.service = None;
+        self.enabled = false;
+        self.package_directory_update = settings.package_directory.clone();
+        let provider = settings.provider.clone();
+        let online_2d = settings.online_authorized;
+        self.settings = Some(settings);
+        if let Some(provider) = provider.filter(|p| online_2d || p.allow_online_3d) {
+            let tiles = ImageryTiles::new(provider, ctx.clone())?;
+            self.service = Some(tiles.service.clone());
+            self.tiles = online_2d.then_some(tiles);
+            self.message = (!online_2d).then(|| "Satellite: Online 2D not enabled".into());
+        } else {
+            self.message = Some("Satellite source unavailable or Online 2D not enabled".into());
+        }
+        Ok(())
     }
     pub fn controls(&mut self, ui: &mut Ui) {
         self.poll(ui.ctx());
@@ -81,9 +87,8 @@ impl ImageryView {
                 self.settings_open = true;
             }
             if ui.small_button("Reload source").clicked() {
-                self.tiles = None;
+                self.retry();
                 self.enabled = false;
-                self.attempted = false;
             }
         });
     }

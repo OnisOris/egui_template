@@ -26,6 +26,7 @@ fn closer_camera_fetches_new_zoom_without_mesh_changes_and_failure_keeps_texture
     let mut world = dem_tests::world();
     dem_tests::install(&mut world, source::load_terrain(dir.path()).unwrap());
     let mut picker = super::picker::MapPicker::default();
+    picker.imagery.service = Some(service.clone());
     picker.imagery.tiles = Some(ImageryTiles::from_service(
         service,
         bevy_egui::egui::Context::default(),

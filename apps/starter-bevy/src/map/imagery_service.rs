@@ -23,7 +23,6 @@ struct Cache {
     order: VecDeque<Tile>,
     bytes: usize,
     hits: u64,
-    requests: u64,
     decode_ms: f64,
 }
 struct Service {
@@ -32,6 +31,7 @@ struct Service {
     job: Job,
     provider: ImageryProvider,
     pub generation: u64,
+    http: Arc<Download>,
 }
 impl Drop for Service {
     fn drop(&mut self) {
@@ -103,6 +103,7 @@ impl TileService {
                         }
                         if let Some(entry) = state.entries.get_mut(&tile) {
                             entry.result = Some(result);
+                            entry.touched = Instant::now();
                         }
                     }
                 })
@@ -115,6 +116,7 @@ impl TileService {
             job,
             provider,
             generation: GENERATION.fetch_add(1, Ordering::Relaxed),
+            http,
         })))
     }
     pub fn generation(&self) -> u64 {
@@ -166,7 +168,6 @@ impl TileService {
             cache.order.retain(|t| *t != old);
         }
         if self.0.requests.try_send(tile).is_ok() {
-            cache.requests += 1;
             cache.entries.insert(
                 tile,
                 Entry {
@@ -189,6 +190,11 @@ impl TileService {
     }
     pub fn stats(&self) -> (u64, u64, usize, f64) {
         let c = self.0.cache.lock().unwrap();
-        (c.requests, c.hits, c.bytes, c.decode_ms)
+        (
+            self.0.http.requests.load(Ordering::Relaxed),
+            c.hits,
+            c.bytes,
+            c.decode_ms,
+        )
     }
 }

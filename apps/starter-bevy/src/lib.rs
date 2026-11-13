@@ -68,6 +68,8 @@ pub fn build() -> App {
                 metrics::log_bench,
             ),
         )
+        .add_systems(First, metrics::begin_frame)
+        .add_systems(Last, metrics::end_frame)
         .add_systems(EguiPrimaryContextPass, ui::editor_ui)
         .add_systems(Last, layout::save_on_exit.after(bevy::window::ExitSystems));
     app

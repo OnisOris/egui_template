@@ -126,6 +126,9 @@ pub fn prepare(
         Vec::new()
     };
     job.check()?;
+    let rgba = image::DynamicImage::ImageRgb8(image)
+        .into_rgba8()
+        .into_raw();
     let preparation_ms = start.elapsed().saturating_sub(received).as_secs_f64() * 1000.0;
     info!(
         "Live imagery z{z}: {} tiles in {:.3}s, preparation {:.2}ms, service {:?}",
@@ -136,9 +139,7 @@ pub fn prepare(
     );
     Ok(LiveTexture {
         metadata,
-        rgba: image::DynamicImage::ImageRgb8(image)
-            .into_rgba8()
-            .into_raw(),
+        rgba,
         uvs,
         preparation_ms,
     })
@@ -152,7 +153,7 @@ pub fn update(
     import: Res<super::satellite_scene::SatelliteImport>,
     mut assets: SceneAssets,
 ) {
-    let service = picker.imagery.tiles.as_ref().map(|t| t.service.clone());
+    let service = picker.imagery.service.clone();
     let current = active
         .get()
         .and_then(|(revision, _)| {
@@ -201,7 +202,7 @@ pub fn update(
         let terrain = scene.data.clone().unwrap();
         let job = Job {
             cancelled: Arc::new(AtomicBool::new(false)),
-            progress: Arc::default(),
+            progress: Arc::new(Mutex::new("Satellite: Loading".into())),
         };
         let work = job.clone();
         let (send, reply) = mpsc::sync_channel(1);

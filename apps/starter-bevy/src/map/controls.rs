@@ -122,14 +122,15 @@ pub fn viewport_bar(
         && scene.satellite_enabled
         && let Some(loaded) = &scene.satellite
     {
-        ui.small(format!(
-            "Satellite: {} · imagery zoom {}",
-            match loaded.source {
-                super::satellite_scene::ImagerySource::Package(_) => "Local Package",
-                super::satellite_scene::ImagerySource::Live { .. } => "Live",
-            },
-            loaded.metadata.zoom
-        ));
+        if matches!(
+            loaded.source,
+            super::satellite_scene::ImagerySource::Package(_)
+        ) {
+            ui.small(format!(
+                "Satellite: Local Package · imagery zoom {}",
+                loaded.metadata.zoom
+            ));
+        }
         ui.small(&loaded.metadata.attribution);
     }
     if !import.builder.status().is_empty()

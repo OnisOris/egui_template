@@ -28,12 +28,12 @@ pub fn show(ui: &mut Ui, view: &mut ImageryView) {
             if let Some(p) = &mut settings.provider {
                 ui.label(format!("Selected source: {}", p.name));
                 ui.label(if p.allow_permanent_packages {
-                    "Access: Licensed Package / Online Preview"
+                    "Storage: RAM and permitted packages"
                 } else {
-                    "Access: Online Preview · memory cache only"
+                    "Storage: RAM only"
                 });
                 ui.label(format!(
-                    "Export / permanent packages: {}",
+                    "Offline Package Export: {}",
                     if p.allow_permanent_packages {
                         "permitted by configuration"
                     } else {
@@ -44,7 +44,7 @@ pub fn show(ui: &mut Ui, view: &mut ImageryView) {
                 ui.label(&p.attribution);
                 ui.checkbox(
                     &mut settings.online_authorized,
-                    "Online access is authorized for this application",
+                    "Online 2D use is authorized for this application",
                 );
                 ui.label(format!(
                     "Online 2D: {}",
@@ -72,11 +72,11 @@ pub fn show(ui: &mut Ui, view: &mut ImageryView) {
                 p.bearer_env = (!bearer.trim().is_empty()).then(|| bearer.trim().to_owned());
                 if p.name == "Esri World Imagery" {
                     p.allow_permanent_packages = false;
+                    ui.hyperlink_to(
+                        "Esri service / attribution information",
+                        "https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9",
+                    );
                 }
-                ui.hyperlink_to(
-                    "Esri service / attribution information",
-                    "https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9",
-                );
             } else {
                 ui.label("Satellite source not configured");
             }
@@ -111,6 +111,7 @@ pub fn show(ui: &mut Ui, view: &mut ImageryView) {
     view.settings_open = open;
     if apply && let Some(settings) = view.settings.clone() {
         view.tiles = None;
+        view.service = None;
         view.enabled = false;
         view.message = None;
         view.task = Some(AsyncComputeTaskPool::get().spawn(async move {

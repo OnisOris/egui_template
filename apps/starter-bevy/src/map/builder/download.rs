@@ -4,7 +4,7 @@ use std::{
     io::Read,
     sync::{
         Mutex,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
     },
     time::Duration,
 };
@@ -12,6 +12,7 @@ use std::{
 pub struct Download {
     client: reqwest::blocking::Client,
     pub parallelism: usize,
+    pub requests: AtomicU64,
 }
 impl Download {
     pub fn new(parallelism: usize) -> Result<Self, String> {
@@ -26,6 +27,7 @@ impl Download {
                 .build()
                 .map_err(|_| "Cannot initialize HTTP client")?,
             parallelism,
+            requests: AtomicU64::new(0),
         })
     }
     pub fn get(&self, url: &str, token: Option<&str>, job: &Job) -> Result<Vec<u8>, String> {
@@ -37,6 +39,7 @@ impl Download {
                 request = request.bearer_auth(token);
             }
             let mut retry_delay = Duration::from_millis(500 << attempt);
+            self.requests.fetch_add(1, Ordering::Relaxed);
             match request.send() {
                 Ok(response) => {
                     let status = response.status();
@@ -57,6 +60,7 @@ impl Download {
                         }
                         return Ok(bytes);
                     }
+                    // shortcut: HTTP-date/long Retry-After stops retries; parse dates if a source needs automatic recovery.
                     if status == reqwest::StatusCode::TOO_MANY_REQUESTS
                         && let Some(value) = response.headers().get(reqwest::header::RETRY_AFTER)
                     {

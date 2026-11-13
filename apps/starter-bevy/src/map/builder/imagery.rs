@@ -179,7 +179,7 @@ pub fn configured(path: Option<std::ffi::OsString>) -> Result<Option<ImageryProv
         )
     } else {
         let settings = crate::map::sources::load_saved()?;
-        settings.provider.filter(|_| settings.online_authorized)
+        settings.provider
     };
     if let Some(provider) = &provider {
         provider.validate_preview()?;

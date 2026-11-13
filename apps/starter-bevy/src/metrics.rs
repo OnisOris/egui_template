@@ -8,6 +8,8 @@ use crate::state::DocumentResource;
 pub struct EditorMetrics {
     pub fps: f32,
     pub frame_ms: f32,
+    pub cpu_frame_ms: f32,
+    cpu_started: Option<std::time::Instant>,
     pub ui_ms: f32,
     pub sync_ms: f32,
     pub scene_build_ms: f32,
@@ -24,6 +26,8 @@ impl Default for EditorMetrics {
         Self {
             fps: 0.0,
             frame_ms: 0.0,
+            cpu_frame_ms: 0.0,
+            cpu_started: None,
             ui_ms: 0.0,
             sync_ms: 0.0,
             scene_build_ms: 0.0,
@@ -37,6 +41,16 @@ impl Default for EditorMetrics {
     }
 }
 
+pub fn begin_frame(mut metrics: ResMut<EditorMetrics>) {
+    metrics.cpu_started = Some(std::time::Instant::now());
+}
+
+pub fn end_frame(mut metrics: ResMut<EditorMetrics>) {
+    if let Some(start) = metrics.cpu_started.take() {
+        metrics.cpu_frame_ms = start.elapsed().as_secs_f32() * 1000.0;
+    }
+}
+
 pub fn log_bench(time: Res<Time>, metrics: Res<EditorMetrics>, mut elapsed: Local<f32>) {
     if std::env::var_os("STARTER_BENCH").is_none() {
         return;
@@ -47,11 +61,12 @@ pub fn log_bench(time: Res<Time>, metrics: Res<EditorMetrics>, mut elapsed: Loca
     }
     *elapsed = 0.0;
     println!(
-        "BENCH objects={} entities={} fps={:.1} frame_ms={:.2} ui_ms={:.2} sync_ms={:.3} build_ms={:.2}",
+        "BENCH objects={} entities={} fps={:.1} frame_ms={:.2} main_cpu_ms={:.2} ui_ms={:.2} sync_ms={:.3} build_ms={:.2}",
         metrics.objects,
         metrics.projected_entities,
         metrics.fps,
         metrics.frame_ms,
+        metrics.cpu_frame_ms,
         metrics.ui_ms,
         metrics.sync_ms,
         metrics.scene_build_ms,

@@ -115,12 +115,14 @@ impl Tiles for ImageryTiles {
                 Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
             ));
         }
-        self.service.request(SourceTile {
-            z: id.zoom,
-            x: id.x,
-            y: id.y,
-        });
-        self.pending.insert(id);
+        if self.pending.len() < 64 {
+            self.service.request(SourceTile {
+                z: id.zoom,
+                x: id.x,
+                y: id.y,
+            });
+            self.pending.insert(id);
+        }
         None
     }
     fn attribution(&self) -> Attribution {

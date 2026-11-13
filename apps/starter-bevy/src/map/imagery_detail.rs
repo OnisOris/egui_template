@@ -96,11 +96,11 @@ pub fn update(
         detail.wanted.clear();
         detail.failed.clear();
     }
-    let (Some(base), Some(terrain), Some(tiles)) = (base, &scene.data, &picker.imagery.tiles)
+    let (Some(base), Some(terrain), Some(service)) = (base, &scene.data, &picker.imagery.service)
     else {
         return;
     };
-    let service = tiles.service.clone();
+    let service = service.clone();
     if !matches!(base.source, ImagerySource::Live { generation } if generation == service.generation())
     {
         return;

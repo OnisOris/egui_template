@@ -54,9 +54,13 @@ pub fn plans(
                 .max(1.0);
             let delta = center - eye;
             let depth = delta.dot(forward);
+            let span = match camera.projection {
+                crate::viewport::ProjectionMode::Perspective => depth.max(0.0),
+                crate::viewport::ProjectionMode::Orthographic => camera.distance,
+            };
             let visible = depth + radius > 0.0
-                && delta.dot(right).abs() < depth.max(0.0) * tangent * aspect + radius
-                && delta.dot(up).abs() < depth.max(0.0) * tangent + radius;
+                && delta.dot(right).abs() < span * tangent * aspect + radius
+                && delta.dot(up).abs() < span * tangent + radius;
             if visible {
                 let (west, north) = local_to_wgs84(m.origin, a[0], a[1]);
                 let (east, south) = local_to_wgs84(m.origin, b[0], b[1]);
@@ -70,6 +74,10 @@ pub fn plans(
                     origin: m.origin,
                 };
                 let distance = (delta.length() - radius).max(1.0);
+                let distance = match camera.projection {
+                    crate::viewport::ProjectionMode::Perspective => distance,
+                    crate::viewport::ProjectionMode::Orthographic => camera.distance,
+                };
                 let step = f64::from(2.0 * distance * tangent / viewport.size.y.max(1) as f32);
                 let mut zoom = coverage::zoom(region, p.min_zoom, p.max_zoom, p.tile_size, step);
                 if let Some(&old) = installed.get(&index) {

@@ -190,9 +190,7 @@ impl Worker {
                                 Ok(Some(payload)) => {
                                     Output::Satellite(Box::new(payload), data.fingerprint)
                                 }
-                                Ok(None) => {
-                                    Output::Done("Partial · Satellite source not configured".into())
-                                }
+                                Ok(None) => Output::Done("Terrain ready".into()),
                                 Err(e) => Output::Done(format!("Partial · {e}")),
                             };
                             if send.send((key, Ok(output))).is_err() {

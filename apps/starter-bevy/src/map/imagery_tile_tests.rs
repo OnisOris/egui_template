@@ -126,3 +126,37 @@ fn source_and_configuration_generations_do_not_share_cache_or_credentials() {
     assert!(!first.provider().allow_online_3d);
     assert!(first.provider().validate().is_err());
 }
+
+#[test]
+fn different_sources_and_renewed_authorization_fetch_independent_tiles() {
+    use super::{
+        builder::coverage::Tile,
+        imagery_fixture::{Fixture, job},
+        imagery_service::TileService,
+    };
+    let a = Fixture::new();
+    let b = Fixture::new();
+    let first = TileService::new(a.provider.clone(), Some("first-token".into())).unwrap();
+    let second = TileService::new(b.provider.clone(), Some("second-token".into())).unwrap();
+    let renewed = TileService::new(a.provider.clone(), Some("renewed-token".into())).unwrap();
+    let tile = Tile { z: 2, x: 1, y: 1 };
+    let original = first.get(tile, &job()).unwrap();
+    let different = second.get(tile, &job()).unwrap();
+    let fresh = renewed.get(tile, &job()).unwrap();
+    assert!(!Arc::ptr_eq(original.as_raw(), different.as_raw()));
+    assert!(!Arc::ptr_eq(original.as_raw(), fresh.as_raw()));
+    assert_eq!(a.requests.lock().unwrap().len(), 2);
+    assert_eq!(b.requests.lock().unwrap().len(), 1);
+}
+
+#[test]
+fn walkers_pending_queue_stays_bounded_when_panning_past_loading_tiles() {
+    use super::{imagery_fixture::Fixture, imagery_service::TileService};
+    let fixture = Fixture::new();
+    let service = TileService::new(fixture.provider.clone(), None).unwrap();
+    let mut tiles = ImageryTiles::from_service(service, Context::default());
+    for x in 0..300 {
+        tiles.at(TileId { zoom: 19, x, y: 0 });
+    }
+    assert!(tiles.stats().in_progress <= 64);
+}

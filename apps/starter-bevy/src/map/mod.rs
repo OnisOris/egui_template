@@ -119,3 +119,6 @@ mod imagery_fixture;
 
 #[cfg(test)]
 mod imagery_lod_tests;
+
+#[cfg(test)]
+mod imagery_measurements;
