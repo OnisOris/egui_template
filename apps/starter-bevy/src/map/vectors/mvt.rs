@@ -110,6 +110,7 @@ pub fn extract(bytes: Vec<u8>, tile: Tile, data: &mut VectorData) -> Result<(), 
                     || min_height_m < 0.
                     || height_m <= min_height_m
                 {
+                    data.skipped_buildings += 1;
                     continue;
                 }
                 let polygons = match geometry {
@@ -170,6 +171,8 @@ pub fn empty(region: MapRegion, id: String) -> VectorData {
         attribution: "© OpenFreeMap © OpenMapTiles © OpenStreetMap contributors".into(),
         package_id: id,
         fingerprint: blake3::hash(&[]),
+        skipped_buildings: 0,
+        metrics: VectorMetrics::default(),
         roads: Vec::new(),
         buildings: Vec::new(),
     }

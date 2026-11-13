@@ -79,6 +79,9 @@ pub fn building(mesh: &mut Triangles, polygon: &BuildingPolygon, bottom: f32, to
     }
 }
 pub fn build(data: &VectorData, terrain: &TerrainPayload, flat: bool) -> Vec<Chunk> {
+    let mut uneven = 0usize;
+    let mut missing = 0usize;
+    let mut max_ground_span = 0f32;
     let mut batches: BTreeMap<(i32, i32, bool), Triangles> = BTreeMap::new();
     let key = |p: LocalPoint2, b| ((p.x / 512.).floor() as i32, (p.y / 512.).floor() as i32, b);
     for b in &data.buildings {
@@ -90,8 +93,25 @@ pub fn build(data: &VectorData, terrain: &TerrainPayload, flat: bool) -> Vec<Chu
                 y: ring.iter().map(|p| p.y).sum::<f64>() / ring.len() as f64,
             };
             let Some(h) = (if flat { Some(0.) } else { ground(terrain, p) }) else {
+                missing += 1;
                 continue;
             };
+            if !flat {
+                let heights = ring
+                    .iter()
+                    .map(|p| ground(terrain, *p))
+                    .collect::<Option<Vec<_>>>();
+                let Some(heights) = heights else {
+                    missing += 1;
+                    continue;
+                };
+                let span = heights.iter().copied().fold(f32::NEG_INFINITY, f32::max)
+                    - heights.iter().copied().fold(f32::INFINITY, f32::min);
+                max_ground_span = max_ground_span.max(span);
+                if span > 3. {
+                    uneven += 1;
+                }
+            }
             building(
                 batches.entry(key(p, true)).or_default(),
                 polygon,
@@ -121,12 +141,20 @@ pub fn build(data: &VectorData, terrain: &TerrainPayload, flat: bool) -> Vec<Chu
                         x: a.x + (b.x - a.x) * t,
                         y: a.y + (b.y - a.y) * t,
                     };
-                    let h = if flat { Some(0.) } else { ground(terrain, p) }? + 0.15;
                     let side = |s: f64| LocalPoint2 {
                         x: (p.x + n.x * s).clamp(rect.min().x, rect.max().x),
                         y: (p.y + n.y * s).clamp(rect.min().y, rect.max().y),
                     };
-                    Some((point(side(-1.), h), point(side(1.), h), p))
+                    let left = side(-1.);
+                    let right = side(1.);
+                    let height = |p| {
+                        if flat {
+                            Some(0.15)
+                        } else {
+                            ground(terrain, p).map(|h| h + 0.15)
+                        }
+                    };
+                    Some((point(left, height(left)?), point(right, height(right)?), p))
                 };
                 let (Some((a, b, p)), Some((c, d, _))) = (sample(i), sample(i + 1)) else {
                     continue;
@@ -136,6 +164,14 @@ pub fn build(data: &VectorData, terrain: &TerrainPayload, flat: bool) -> Vec<Chu
                 batch.triangle(c, b, d, true);
             }
         }
+    }
+    if !flat {
+        bevy::log::info!(
+            "Building ground diagnostics: {} polygons above 3 m ground span, max={:.2} m, {} skipped without ground",
+            uneven,
+            max_ground_span,
+            missing
+        );
     }
     batches
         .into_iter()

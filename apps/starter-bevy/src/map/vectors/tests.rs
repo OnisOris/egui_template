@@ -26,7 +26,7 @@ fn bincode_package_validation_holes_multipolygon_and_terrain_draping() {
             LocalPoint2 { x: 49., y: 10. },
         ],
     }];
-    let buildings = vec![BuildingFeature {
+    let mut buildings = vec![BuildingFeature {
         id: "house".into(),
         height_m: 12.,
         min_height_m: 1.,
@@ -86,7 +86,35 @@ fn bincode_package_validation_holes_multipolygon_and_terrain_draping() {
         panic!()
     };
     assert!(p.iter().any(|p| p[1] > 5.));
+    for p in p {
+        let h = mesh::ground(
+            &terrain,
+            LocalPoint2 {
+                x: f64::from(p[0]),
+                y: f64::from(p[2]),
+            },
+        )
+        .unwrap();
+        assert!((p[1] - h - 0.15).abs() < 0.001);
+    }
     assert_eq!(terrain.position(5, 5)[2], 15.);
+    buildings[0].height_m = 5.;
+    buildings[0].min_height_m = 21.;
+    std::fs::write(
+        dir.path().join("buildings.bin"),
+        bincode::serde::encode_to_vec(&buildings, bincode::config::standard()).unwrap(),
+    )
+    .unwrap();
+    let filtered = package::load(dir.path(), terrain.manifest.region()).unwrap();
+    assert!(filtered.buildings.is_empty());
+    assert_eq!(filtered.skipped_buildings, 1);
+    buildings[0].height_m = f32::NAN;
+    std::fs::write(
+        dir.path().join("buildings.bin"),
+        bincode::serde::encode_to_vec(&buildings, bincode::config::standard()).unwrap(),
+    )
+    .unwrap();
+    assert!(package::load(dir.path(), terrain.manifest.region()).is_err());
     let mut wrong = terrain.manifest.region();
     wrong.origin.latitude += 0.001;
     assert!(package::load(dir.path(), wrong).is_err());

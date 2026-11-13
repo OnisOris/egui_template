@@ -89,9 +89,15 @@ fn local_tilejson_cache_and_cancellation_need_no_public_server() {
     let n = seen.lock().unwrap().len();
     assert_eq!(data.buildings.len(), 1);
     assert_eq!(n, 2);
+    assert_eq!(data.metrics.tiles, 1);
+    assert_eq!(data.metrics.http_requests, 2);
+    assert!(!data.metrics.processed_cache_hit);
     let reused = source::load(region(), dir.path(), &url, &job).unwrap();
     assert_eq!(seen.lock().unwrap().len(), n);
     assert_eq!(reused.fingerprint, data.fingerprint);
+    assert!(reused.metrics.processed_cache_hit);
+    assert_eq!(reused.metrics.http_requests, 0);
+    assert_eq!(reused.metrics.tiles, 1);
     let cache = dir
         .path()
         .join("vectors")
@@ -100,6 +106,8 @@ fn local_tilejson_cache_and_cancellation_need_no_public_server() {
     std::fs::write(cache, [255u8; 8]).unwrap();
     let repaired = source::load(region(), dir.path(), &url, &job).unwrap();
     assert_eq!(repaired.fingerprint, data.fingerprint);
+    assert_eq!(repaired.metrics.tile_cache_hits, 1);
+    assert_eq!(repaired.metrics.http_requests, 1);
     assert_eq!(seen.lock().unwrap().len(), n + 1); // TileJSON reloaded; the validated PBF is reused.
     stop.store(true, Ordering::Relaxed);
     thread.join().unwrap();

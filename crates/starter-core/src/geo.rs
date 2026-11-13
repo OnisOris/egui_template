@@ -79,9 +79,43 @@ pub struct MapRegion {
 }
 
 impl MapRegion {
+    /// Shared tolerance for JSON round-trip error, below 0.2 mm on Earth.
+    pub fn matches(self, other: Self) -> bool {
+        [
+            self.bounds.west - other.bounds.west,
+            self.bounds.east - other.bounds.east,
+            self.bounds.south - other.bounds.south,
+            self.bounds.north - other.bounds.north,
+            self.origin.longitude - other.origin.longitude,
+            self.origin.latitude - other.origin.latitude,
+        ]
+        .into_iter()
+        .all(|d| d.abs() <= 1e-9)
+    }
+
     pub fn new(bounds: GeoBounds, origin: GeoOrigin) -> Result<Self, &'static str> {
         bounds.validate()?;
         origin.validate()?;
         Ok(Self { bounds, origin })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn region_matching_accepts_roundtrip_noise_but_rejects_a_different_origin() {
+        let b = super::GeoBounds {
+            west: 37.615387061386684,
+            south: 55.745090331002885,
+            east: 37.6331015072041,
+            north: 55.75536216322164,
+        };
+        let a = super::MapRegion::new(b, b.center()).unwrap();
+        let mut noisy = a;
+        noisy.origin.latitude += 1e-13;
+        noisy.bounds.east -= 1e-13;
+        assert!(a.matches(noisy));
+        noisy.origin.latitude += 1e-5;
+        assert!(!a.matches(noisy));
     }
 }

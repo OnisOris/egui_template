@@ -27,7 +27,16 @@ pub fn build(
                     }
                 };
                 let ready = current && present;
-                let status = if ready {
+                let vector = matches!(kind, LayerKind::Roads | LayerKind::Buildings);
+                let status = if vector && real.vector_status.contains("Failed") {
+                    "Failed"
+                } else if vector
+                    && (real.vector_status.contains("Loading")
+                        || real.vector_status.contains("Reading TileJSON")
+                        || real.vector_status.contains("geometry"))
+                {
+                    "Loading"
+                } else if ready {
                     "Ready"
                 } else if import.builder.loading || import.loading() {
                     "Loading"
@@ -49,23 +58,31 @@ pub fn build(
         }
         b.close_dir();
         if b.dir(Node::Objects, "Objects") {
-            for marker in project.document.object_rows() {
-                b.leaf(
-                    match marker.selection {
-                        starter_core::ProjectSelection::Model(id) => Node::Model(id),
-                        _ => Node::Marker(marker.id),
-                    },
-                    format!(
-                        "{}{}{}",
-                        if marker.kind == "Model" {
-                            "Model · "
-                        } else {
-                            ""
-                        },
-                        marker.name,
-                        if marker.visible { "" } else { " [hidden]" }
-                    ),
-                );
+            for (node, label, models) in [
+                (Node::MapMarkers, "Map Markers", false),
+                (Node::ModelInstances, "Model Instances", true),
+            ] {
+                if b.dir(node, label) {
+                    for marker in project
+                        .document
+                        .object_rows()
+                        .filter(|m| (m.kind == "Model") == models)
+                    {
+                        b.leaf(
+                            if models {
+                                Node::Model(marker.id)
+                            } else {
+                                Node::Marker(marker.id)
+                            },
+                            format!(
+                                "{}{}",
+                                marker.name,
+                                if marker.visible { "" } else { " [hidden]" }
+                            ),
+                        );
+                    }
+                }
+                b.close_dir();
             }
         }
         b.close_dir();

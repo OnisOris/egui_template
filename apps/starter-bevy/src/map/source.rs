@@ -46,18 +46,7 @@ impl TerrainManifest {
     }
 
     pub fn matches(&self, region: MapRegion) -> bool {
-        let a = self.region();
-        let b = region;
-        [
-            a.bounds.west - b.bounds.west,
-            a.bounds.east - b.bounds.east,
-            a.bounds.south - b.bounds.south,
-            a.bounds.north - b.bounds.north,
-            a.origin.longitude - b.origin.longitude,
-            a.origin.latitude - b.origin.latitude,
-        ]
-        .into_iter()
-        .all(|d| d.abs() <= 1e-9)
+        self.region().matches(region)
     }
 
     fn validate(&self) -> Result<usize, String> {

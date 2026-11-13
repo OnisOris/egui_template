@@ -73,6 +73,13 @@ fn explorer_and_virtual_table_select_the_same_document_markers() {
     harness.run();
     assert!(harness.query_all_by_label("Group A").next().is_none());
     assert!(harness.query_all_by_label("Groups").next().is_none());
+    assert!(harness.query_all_by_label("Map Markers").next().is_some());
+    assert!(
+        harness
+            .query_all_by_label("Model Instances")
+            .next()
+            .is_some()
+    );
     harness
         .query_all_by_label("Marker 1")
         .next()
@@ -91,7 +98,7 @@ fn explorer_and_virtual_table_select_the_same_document_markers() {
         ProjectSelection::Marker(second)
     );
     harness
-        .query_all_by_label("Model · Model 3")
+        .query_all_by_label("Model 3")
         .next()
         .unwrap()
         .click();

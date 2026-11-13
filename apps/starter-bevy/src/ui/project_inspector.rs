@@ -84,6 +84,9 @@ pub fn show(
             match kind {
                 LayerKind::Roads | LayerKind::Buildings => {
                     ui.label(&real.vector_status);
+                    if project.document.geo_view_mode == starter_core::GeoViewMode::Terrain {
+                        ui.small("Hidden in Terrain mode · use City or Combined");
+                    }
                     let mut source = project.document.vector_source;
                     ui.radio_value(
                         &mut source,

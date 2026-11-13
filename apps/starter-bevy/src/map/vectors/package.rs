@@ -38,7 +38,12 @@ pub fn load(path: &Path, region: MapRegion) -> Result<VectorData, String> {
     let bytes = read_limited(&path.join("manifest.json"), 1_048_576)?;
     let m: Manifest = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
     m.map.validate(None)?;
-    if m.map.bbox != region.bounds || m.map.origin != region.origin {
+    if !(MapRegion {
+        bounds: m.map.bbox,
+        origin: m.map.origin,
+    })
+    .matches(region)
+    {
         return Err("Vector package bbox/origin differs from the confirmed region".into());
     }
     let v = m.vectors;
@@ -58,12 +63,14 @@ pub fn load(path: &Path, region: MapRegion) -> Result<VectorData, String> {
     hasher.update(&bytes);
     hasher.update(&roads);
     hasher.update(&buildings);
-    let data = VectorData {
+    let mut data = VectorData {
         region,
         source: v.provider,
         attribution: v.attribution,
         package_id: m.map.map_data_id,
         fingerprint: hasher.finalize(),
+        skipped_buildings: 0,
+        metrics: VectorMetrics::default(),
         roads: decode(&roads)?,
         buildings: decode(&buildings)?,
     };
@@ -71,6 +78,16 @@ pub fn load(path: &Path, region: MapRegion) -> Result<VectorData, String> {
         || data.buildings.len() != v.building_count as usize
     {
         return Err("Vector manifest counts differ from binaries".into());
+    }
+    clip::validate_geometry(&data)?;
+    let count = data.buildings.len();
+    data.buildings.retain(valid_height);
+    data.skipped_buildings = count - data.buildings.len();
+    if data.skipped_buildings > 0 {
+        bevy::log::warn!(
+            "Vector package: discarded {} buildings with inconsistent height/min_height",
+            data.skipped_buildings
+        );
     }
     clip::validate(&data)?;
     Ok(data)

@@ -16,12 +16,16 @@ fn main() -> Result<(), String> {
             .ok_or("vector_probe TERRAIN_DIR [VECTOR_PACKAGE_DIR]")?,
     ))?;
     let started = Instant::now();
-    let data = if let Some(path) = args.get(2) {
+    let data = if let Some(path) = args.get(2).filter(|p| p.as_str() != "--online") {
         package::load(Path::new(path), terrain.manifest.region())?
     } else {
         source::load(
             terrain.manifest.region(),
-            &cache::root()?,
+            &args
+                .get(3)
+                .map(std::path::PathBuf::from)
+                .map(Ok)
+                .unwrap_or_else(cache::root)?,
             source::TILEJSON,
             &Job {
                 cancelled: Arc::new(AtomicBool::new(false)),
@@ -36,6 +40,10 @@ fn main() -> Result<(), String> {
         data.source,
         started.elapsed().as_secs_f64() * 1000.,
         data.fingerprint
+    );
+    println!(
+        "metrics={:?}, skipped_buildings={}",
+        data.metrics, data.skipped_buildings
     );
     for flat in [true, false] {
         let started = Instant::now();

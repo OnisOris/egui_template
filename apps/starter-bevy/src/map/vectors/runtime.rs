@@ -22,6 +22,7 @@ pub struct VectorScene {
     restore_attempted: bool,
     project_generation: u64,
     imported: bool,
+    source_at_request: starter_core::VectorSource,
     mesh_task: Option<Task<Vec<mesh::Chunk>>>,
     job: Option<Job>,
     revision: Option<u64>,
@@ -43,15 +44,24 @@ impl VectorScene {
             assets.materials.remove(h.id());
         }
     }
-    fn cancel(&mut self) {
+    fn cancel_download(&mut self) {
         if let Some(job) = self.job.take() {
             job.cancelled.store(true, Ordering::Relaxed)
         }
         self.task = None;
+    }
+    fn cancel(&mut self) {
+        self.cancel_download();
         self.mesh_task = None;
     }
-    fn start(&mut self, region: starter_core::MapRegion, request: Load) {
-        self.cancel();
+    fn start(
+        &mut self,
+        region: starter_core::MapRegion,
+        request: Load,
+        selection: starter_core::VectorSource,
+    ) {
+        self.cancel_download();
+        self.source_at_request = selection;
         self.imported = matches!(request, Load::Import);
         let (job, task) = loading::start(region, request);
         self.job = Some(job);
@@ -66,9 +76,12 @@ pub fn update(
     mut scene: ResMut<RealScene>,
     mut vectors: ResMut<VectorScene>,
     mut assets: SceneAssets,
-    mut project: ResMut<crate::project::Project>,
-    io: Res<crate::project::ProjectIo>,
+    project_io: (
+        ResMut<crate::project::Project>,
+        Res<crate::project::ProjectIo>,
+    ),
 ) {
+    let (mut project, io) = project_io;
     let revision = active.get().map(|(r, _)| r);
     if vectors.revision != revision
         || vectors.project_generation != io.generation
@@ -94,11 +107,11 @@ pub fn update(
             .package_id
             .clone();
         if manual {
-            vectors.start(region, Load::Import)
+            vectors.start(region, Load::Import, project.document.vector_source)
         } else if project.document.vector_source == starter_core::VectorSource::OpenFreeMap {
-            vectors.start(region, Load::Online)
+            vectors.start(region, Load::Online, project.document.vector_source)
         } else if let Some(id) = id {
-            vectors.start(region, Load::Cached(id))
+            vectors.start(region, Load::Cached(id), project.document.vector_source)
         } else {
             scene.vector_status = "Vectors: Unavailable · Import Vectors for this region".into();
         }
@@ -115,8 +128,12 @@ pub fn update(
             .package_id
             .clone()
         {
-            vectors.start(region, Load::Cached(id));
+            vectors.start(region, Load::Cached(id), project.document.vector_source);
         }
+    }
+    if vectors.task.is_some() && vectors.source_at_request != project.document.vector_source {
+        vectors.cancel_download();
+        scene.vector_status = "Vectors: Source changed · Reload vectors".into();
     }
     if let Some(job) = &vectors.job
         && vectors.task.is_some()
@@ -151,11 +168,9 @@ pub fn update(
                 if changed {
                     project.changed();
                 }
-                if vectors
-                    .data
-                    .as_ref()
-                    .is_some_and(|d| d.fingerprint == data.fingerprint && d.region == data.region)
-                {
+                if vectors.data.as_ref().is_some_and(|d| {
+                    d.fingerprint == data.fingerprint && d.region.matches(data.region)
+                }) {
                     scene.vector_status = ready(&data);
                 } else {
                     vectors.clear(&mut commands, &mut assets);
@@ -168,7 +183,7 @@ pub fn update(
     }
     let terrain = scene.data.as_ref().filter(|_| scene.revision == revision);
     if let (Some(data), Some(terrain)) = (vectors.data.clone(), terrain.cloned())
-        && data.region == terrain.manifest.region()
+        && terrain.manifest.matches(data.region)
         && vectors.terrain != Some(terrain.fingerprint)
     {
         vectors.mesh_task = None;
@@ -200,6 +215,7 @@ pub fn update(
         return;
     };
     vectors.mesh_task = None;
+    let install_started = std::time::Instant::now();
     let road = assets.materials.add(StandardMaterial {
         base_color: Color::srgb(0.65, 0.66, 0.68),
         perceptual_roughness: 0.95,
@@ -232,6 +248,13 @@ pub fn update(
         vectors.meshes.push(h);
     }
     vectors.materials = vec![road, building];
+    info!(
+        "Vector CPU asset insertion: {:.3} ms; entities={}, meshes={}, materials={} (GPU upload completion not measured)",
+        install_started.elapsed().as_secs_f64() * 1000.,
+        vectors.entities.len(),
+        vectors.meshes.len(),
+        vectors.materials.len()
+    );
     if let Some(data) = &vectors.data {
         scene.vector_status = ready(data);
     }
@@ -272,11 +295,18 @@ pub fn visibility(
 mod tests;
 
 fn ready(data: &VectorData) -> String {
-    format!(
+    let mut status = format!(
         "Vectors: Ready · {} buildings · {} roads · {} · {}",
         data.buildings.len(),
         data.roads.len(),
         data.source,
         data.attribution
-    )
+    );
+    if data.skipped_buildings > 0 {
+        status.push_str(&format!(
+            " · skipped {} invalid heights",
+            data.skipped_buildings
+        ));
+    }
+    status
 }

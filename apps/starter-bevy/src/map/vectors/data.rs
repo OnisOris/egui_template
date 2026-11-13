@@ -58,8 +58,28 @@ pub struct VectorData {
     pub attribution: String,
     pub package_id: String,
     pub fingerprint: blake3::Hash,
+    pub skipped_buildings: usize,
+    pub metrics: VectorMetrics,
     pub roads: Vec<RoadFeature>,
     pub buildings: Vec<BuildingFeature>,
 }
 pub const MAX_FEATURES: usize = 100_000;
 pub const MAX_POINTS: usize = 2_000_000;
+
+pub fn valid_height(b: &BuildingFeature) -> bool {
+    b.height_m.is_finite()
+        && b.min_height_m.is_finite()
+        && b.min_height_m >= 0.
+        && b.height_m > b.min_height_m
+        && b.height_m <= 2000.
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct VectorMetrics {
+    pub tiles: usize,
+    pub http_requests: u64,
+    pub tile_cache_hits: usize,
+    pub processed_cache_hit: bool,
+    pub load_ms: f64,
+    pub decode_ms: f64,
+}

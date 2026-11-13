@@ -52,6 +52,15 @@ pub fn roads(p: &[LocalPoint2], rect: Rect<f64>) -> Vec<Vec<LocalPoint2>> {
         .collect()
 }
 pub fn validate(data: &VectorData) -> Result<(), String> {
+    if let Some(b) = data.buildings.iter().find(|b| !valid_height(b)) {
+        return Err(format!(
+            "Invalid building {}: height={}, min_height={}",
+            b.id, b.height_m, b.min_height_m
+        ));
+    }
+    validate_geometry(data)
+}
+pub fn validate_geometry(data: &VectorData) -> Result<(), String> {
     MapRegion::new(data.region.bounds, data.region.origin).map_err(String::from)?;
     if data.roads.len() + data.buildings.len() > MAX_FEATURES {
         return Err("Vector feature limit exceeded".into());
@@ -71,7 +80,7 @@ pub fn validate(data: &VectorData) -> Result<(), String> {
     };
     let mut render_vertices = 0u64;
     for r in &data.roads {
-        if r.id.len() > 256 || r.points.len() < 2 || !valid_points(&r.points) {
+        if r.id.is_empty() || r.id.len() > 256 || r.points.len() < 2 || !valid_points(&r.points) {
             return Err("Invalid road coordinates or ID".into());
         }
         render_vertices += r
@@ -83,15 +92,19 @@ pub fn validate(data: &VectorData) -> Result<(), String> {
             .sum::<u64>();
     }
     for b in &data.buildings {
-        if b.id.len() > 256
+        if b.id.is_empty()
+            || b.id.len() > 256
             || b.polygons.is_empty()
             || !b.height_m.is_finite()
             || !b.min_height_m.is_finite()
-            || b.min_height_m < 0.
-            || b.height_m <= b.min_height_m
-            || b.height_m > 2000.
         {
-            return Err("Invalid building height, polygons or ID".into());
+            return Err(format!(
+                "Invalid building {}: height={}, min_height={}, polygons={}",
+                b.id,
+                b.height_m,
+                b.min_height_m,
+                b.polygons.len()
+            ));
         }
         for p in &b.polygons {
             render_vertices += p.rings.iter().map(|r| r.len() as u64 * 12).sum::<u64>();

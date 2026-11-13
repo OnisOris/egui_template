@@ -15,10 +15,10 @@ pub fn terrain_elevation(data: &TerrainPayload, lon: f64, lat: f64) -> Option<f6
     let b = m.bbox;
     if !lon.is_finite()
         || !lat.is_finite()
-        || lon < b.west
-        || lon > b.east
-        || lat < b.south
-        || lat > b.north
+        || lon < b.west - 1e-10
+        || lon > b.east + 1e-10
+        || lat < b.south - 1e-10
+        || lat > b.north + 1e-10
     {
         return None;
     }

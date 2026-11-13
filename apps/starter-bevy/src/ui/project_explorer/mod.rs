@@ -10,6 +10,8 @@ pub enum Node {
     Project,
     Map,
     Objects,
+    MapMarkers,
+    ModelInstances,
     Layer(LayerKind),
     Marker(ObjectId),
     Model(ObjectId),
@@ -107,7 +109,13 @@ pub fn show(
                 rows += 4;
             }
             if state.tree.is_open(&Node::Objects) {
-                rows += project.document.object_count();
+                rows += 2;
+                if state.tree.is_open(&Node::MapMarkers) {
+                    rows += project.document.objects.len();
+                }
+                if state.tree.is_open(&Node::ModelInstances) {
+                    rows += project.document.models.len();
+                }
             }
         }
         rows

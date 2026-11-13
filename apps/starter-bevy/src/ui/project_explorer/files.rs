@@ -45,7 +45,7 @@ pub fn build(b: &mut TreeViewBuilder<'_, Node>, project: &Project, io: &ProjectI
         }
         b.close_dir();
         if b.dir(Node::Geodata, "Geodata") {
-            for kind in [LayerKind::Terrain, LayerKind::Satellite] {
+            for kind in LayerKind::ALL {
                 let layer = project.document.layer(kind);
                 b.leaf(
                     Node::Layer(kind),

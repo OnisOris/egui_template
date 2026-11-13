@@ -24,7 +24,8 @@ pub fn start(region: starter_core::MapRegion, request: Load) -> (Job, ResultTask
                 else {
                     return Ok(None);
                 };
-                let data = package::load(&path, region)?;
+                let mut data = package::load(&path, region)?;
+                data.package_id = format!("vector-local-{}", data.fingerprint);
                 source::store_cache(&data, &root.join("vectors").join(&data.package_id))?;
                 data
             }
